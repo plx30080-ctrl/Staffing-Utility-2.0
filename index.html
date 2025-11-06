@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Staffing Manager</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #667eea;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .content {
+            padding: 32px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .setup-form {
+            display: grid;
+            gap: 24px;
+        }
+
+        .form-section {
+            background: #f9fafb;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .form-section h3 {
+            font-size: 18px;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .lines-container {
+            display: grid;
+            gap: 20px;
+        }
+
+        .line-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .line-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+
+        .line-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .line-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .line-letter {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .line-lead {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .line-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .line-body {
+            padding: 20px;
+        }
+
+        .positions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        .position-slot {
+            background: #f9fafb;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 70px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .position-slot.filled {
+            background: #ecfdf5;
+            border: 2px solid #10b981;
+            border-style: solid;
+        }
+
+        .position-slot.core {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .position-slot.core.arrived {
+            background: #d1fae5;
+            border-color: #10b981;
+        }
+
+        .position-slot.new-associate {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+
+        .position-number {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .position-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .position-notes {
+            font-size: 12px;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .position-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-core {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-new {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-arrived {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .waitlist {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+
+        .waitlist h3 {
+            font-size: 18px;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+
+        .waitlist-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .waitlist-item {
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .waitlist-item:hover {
+            border-color: #667eea;
+            background: #f5f7ff;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            font-size: 24px;
+            color: #111827;
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            justify-content: flex-end;
+        }
+
+        .core-associates-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .core-associate-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .core-associate-info {
+            flex: 1;
+        }
+
+        .core-associate-name {
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .core-associate-notes {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .content {
+                padding: 16px;
+            }
+
+            .positions-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Utility functions for localStorage
+        const storage = {
+            save: (key, data) => localStorage.setItem(key, JSON.stringify(data)),
+            load: (key, defaultValue = null) => {
+                const item = localStorage.getItem(key);
+                return item ? JSON.parse(item) : defaultValue;
+            },
+            remove: (key) => localStorage.removeItem(key)
+        };
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('staffing');
+            const [lines, setLines] = useState([]);
+            const [waitlist, setWaitlist] = useState([]);
+            const [coreAssociates, setCoreAssociates] = useState({});
+            const [showModal, setShowModal] = useState(null);
+            const [modalData, setModalData] = useState({});
+
+            // Load data from localStorage on mount
+            useEffect(() => {
+                const savedLines = storage.load('lines', []);
+                const savedWaitlist = storage.load('waitlist', []);
+                const savedCoreAssociates = storage.load('coreAssociates', {});
+                
+                setLines(savedLines);
+                setWaitlist(savedWaitlist);
+                setCoreAssociates(savedCoreAssociates);
+            }, []);
+
+            // Save data to localStorage whenever it changes
+            useEffect(() => {
+                storage.save('lines', lines);
+            }, [lines]);
+
+            useEffect(() => {
+                storage.save('waitlist', waitlist);
+            }, [waitlist]);
+
+            useEffect(() => {
+                storage.save('coreAssociates', coreAssociates);
+            }, [coreAssociates]);
+
+            const handleSetupShift = (shiftData) => {
+                const newLines = shiftData.lines.map(line => ({
+                    id: Date.now() + Math.random(),
+                    letter: line.letter,
+                    lead: line.lead,
+                    needed: parseInt(line.needed),
+                    positions: Array(parseInt(line.needed)).fill(null).map((_, idx) => {
+                        // Pre-fill with core associates
+                        const coreList = coreAssociates[line.lead] || [];
+                        if (idx < coreList.length) {
+                            return {
+                                id: Date.now() + Math.random() + idx,
+                                name: coreList[idx].name,
+                                notes: coreList[idx].notes,
+                                isCore: true,
+                                arrived: false,
+                                isNew: false
+                            };
+                        }
+                        return null;
+                    })
+                }));
+                
+                setLines(newLines);
+                setWaitlist([]);
+                setActiveTab('staffing');
+            };
+
+            const handleAddCoreAssociate = (lead, associate) => {
+                setCoreAssociates(prev => ({
+                    ...prev,
+                    [lead]: [...(prev[lead] || []), associate]
+                }));
+            };
+
+            const handleRemoveCoreAssociate = (lead, index) => {
+                setCoreAssociates(prev => ({
+                    ...prev,
+                    [lead]: prev[lead].filter((_, i) => i !== index)
+                }));
+            };
+
+            const handleMarkArrived = (lineId, positionId) => {
+                setLines(prev => prev.map(line => {
+                    if (line.id === lineId) {
+                        return {
+                            ...line,
+                            positions: line.positions.map(pos => 
+                                pos?.id === positionId ? { ...pos, arrived: true } : pos
+                            )
+                        };
+                    }
+                    return line;
+                }));
+            };
+
+            const handleRemoveFromLine = (lineId, positionIndex) => {
+                setLines(prev => prev.map(line => {
+                    if (line.id === lineId) {
+                        const newPositions = [...line.positions];
+                        newPositions[positionIndex] = null;
+                        return { ...line, positions: newPositions };
+                    }
+                    return line;
+                }));
+            };
+
+            const handleAssignToLine = (lineId, positionIndex, associateName, isNew = false) => {
+                setLines(prev => prev.map(line => {
+                    if (line.id === lineId) {
+                        const newPositions = [...line.positions];
+                        newPositions[positionIndex] = {
+                            id: Date.now() + Math.random(),
+                            name: associateName,
+                            notes: '',
+                            isCore: false,
+                            arrived: true,
+                            isNew: isNew
+                        };
+                        return { ...line, positions: newPositions };
+                    }
+                    return line;
+                }));
+            };
+
+            const handleAddToWaitlist = (name, isNew = false) => {
+                setWaitlist(prev => [...prev, { 
+                    id: Date.now() + Math.random(), 
+                    name,
+                    isNew,
+                    addedAt: new Date().toLocaleTimeString()
+                }]);
+            };
+
+            const handleRemoveFromWaitlist = (id) => {
+                setWaitlist(prev => prev.filter(item => item.id !== id));
+            };
+
+            const handleAssignFromWaitlist = (waitlistItem, lineId, positionIndex) => {
+                handleAssignToLine(lineId, positionIndex, waitlistItem.name, waitlistItem.isNew);
+                handleRemoveFromWaitlist(waitlistItem.id);
+            };
+
+            const handleClearAll = () => {
+                if (confirm('Are you sure you want to clear all staffing data? This cannot be undone.')) {
+                    setLines([]);
+                    setWaitlist([]);
+                }
+            };
+
+            const handleExport = () => {
+                const data = {
+                    date: new Date().toLocaleDateString(),
+                    lines,
+                    waitlist,
+                    exportedAt: new Date().toISOString()
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `staffing-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+            };
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>📋 Daily Staffing Manager</h1>
+                        <div className="header-actions">
+                            {lines.length > 0 && (
+                                <>
+                                    <button className="btn btn-secondary" onClick={handleExport}>
+                                        💾 Export Data
+                                    </button>
+                                    <button className="btn btn-danger" onClick={handleClearAll}>
+                                        🗑️ Clear All
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="content">
+                        <div className="tabs">
+                            <button 
+                                className={`tab ${activeTab === 'staffing' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('staffing')}
+                            >
+                                📊 Staffing
+                            </button>
+                            <button 
+                                className={`tab ${activeTab === 'setup' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('setup')}
+                            >
+                                ⚙️ Setup Shift
+                            </button>
+                            <button 
+                                className={`tab ${activeTab === 'core' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('core')}
+                            >
+                                👥 Core Associates
+                            </button>
+                        </div>
+
+                        {activeTab === 'staffing' && (
+                            <StaffingView 
+                                lines={lines}
+                                waitlist={waitlist}
+                                onMarkArrived={handleMarkArrived}
+                                onRemoveFromLine={handleRemoveFromLine}
+                                onAssignToLine={handleAssignToLine}
+                                onAddToWaitlist={handleAddToWaitlist}
+                                onRemoveFromWaitlist={handleRemoveFromWaitlist}
+                                onAssignFromWaitlist={handleAssignFromWaitlist}
+                            />
+                        )}
+
+                        {activeTab === 'setup' && (
+                            <SetupView 
+                                onSetupShift={handleSetupShift}
+                                coreAssociates={coreAssociates}
+                            />
+                        )}
+
+                        {activeTab === 'core' && (
+                            <CoreAssociatesView 
+                                coreAssociates={coreAssociates}
+                                onAddCoreAssociate={handleAddCoreAssociate}
+                                onRemoveCoreAssociate={handleRemoveCoreAssociate}
+                            />
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function StaffingView({ lines, waitlist, onMarkArrived, onRemoveFromLine, onAssignToLine, onAddToWaitlist, onRemoveFromWaitlist, onAssignFromWaitlist }) {
+            const [showAssignModal, setShowAssignModal] = useState(false);
+            const [assignTarget, setAssignTarget] = useState(null);
+            const [newAssociateName, setNewAssociateName] = useState('');
+            const [isNewAssociate, setIsNewAssociate] = useState(false);
+
+            if (lines.length === 0) {
+                return (
+                    <div className="empty-state">
+                        <h3>No Shift Configured</h3>
+                        <p>Go to "Setup Shift" to create today's staffing chart.</p>
+                    </div>
+                );
+            }
+
+            const handleOpenAssignModal = (lineId, positionIndex) => {
+                setAssignTarget({ lineId, positionIndex });
+                setShowAssignModal(true);
+                setNewAssociateName('');
+                setIsNewAssociate(false);
+            };
+
+            const handleAssign = () => {
+                if (newAssociateName.trim()) {
+                    onAssignToLine(assignTarget.lineId, assignTarget.positionIndex, newAssociateName.trim(), isNewAssociate);
+                    setShowAssignModal(false);
+                }
+            };
+
+            const handleAddToWaitlistModal = () => {
+                if (newAssociateName.trim()) {
+                    onAddToWaitlist(newAssociateName.trim(), isNewAssociate);
+                    setNewAssociateName('');
+                    setIsNewAssociate(false);
+                }
+            };
+
+            const totalPositions = lines.reduce((sum, line) => sum + line.needed, 0);
+            const filledPositions = lines.reduce((sum, line) => 
+                sum + line.positions.filter(p => p && p.arrived).length, 0
+            );
+
+            return (
+                <>
+                    <div style={{ marginBottom: '24px', padding: '16px', background: '#f9fafb', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>Staffing Progress</h3>
+                            <p style={{ color: '#6b7280' }}>
+                                <strong style={{ color: '#10b981', fontSize: '20px' }}>{filledPositions}</strong> / {totalPositions} positions filled
+                                {waitlist.length > 0 && <span style={{ marginLeft: '16px' }}>• {waitlist.length} on waitlist</span>}
+                            </p>
+                        </div>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={() => handleOpenAssignModal(null, null)}
+                        >
+                            ➕ Add Associate
+                        </button>
+                    </div>
+
+                    <div className="lines-container">
+                        {lines.map(line => (
+                            <LineCard 
+                                key={line.id}
+                                line={line}
+                                onMarkArrived={onMarkArrived}
+                                onRemoveFromLine={onRemoveFromLine}
+                                onOpenAssignModal={handleOpenAssignModal}
+                                waitlist={waitlist}
+                                onAssignFromWaitlist={onAssignFromWaitlist}
+                            />
+                        ))}
+                    </div>
+
+                    {waitlist.length > 0 && (
+                        <div className="waitlist">
+                            <h3>⏱️ Waitlist ({waitlist.length})</h3>
+                            <div className="waitlist-items">
+                                {waitlist.map(item => (
+                                    <div key={item.id} className="waitlist-item">
+                                        <span>{item.name}</span>
+                                        {item.isNew && <span className="badge badge-new">NEW</span>}
+                                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{item.addedAt}</span>
+                                        <button 
+                                            className="btn btn-danger btn-small"
+                                            onClick={() => onRemoveFromWaitlist(item.id)}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {showAssignModal && (
+                        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <h2>Add Associate</h2>
+                                <div className="form-group">
+                                    <label>Associate Name</label>
+                                    <input 
+                                        type="text"
+                                        value={newAssociateName}
+                                        onChange={(e) => setNewAssociateName(e.target.value)}
+                                        placeholder="Enter name"
+                                        autoFocus
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                if (assignTarget) {
+                                                    handleAssign();
+                                                } else {
+                                                    handleAddToWaitlistModal();
+                                                }
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <input 
+                                        type="checkbox"
+                                        id="isNew"
+                                        checked={isNewAssociate}
+                                        onChange={(e) => setIsNewAssociate(e.target.checked)}
+                                    />
+                                    <label htmlFor="isNew" style={{ marginLeft: '8px' }}>First Day (New Associate)</label>
+                                </div>
+                                <div className="modal-actions">
+                                    <button className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>
+                                        Cancel
+                                    </button>
+                                    {assignTarget ? (
+                                        <button className="btn btn-success" onClick={handleAssign}>
+                                            Assign to Position
+                                        </button>
+                                    ) : (
+                                        <button className="btn btn-success" onClick={handleAddToWaitlistModal}>
+                                            Add to Waitlist
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            );
+        }
+
+        function LineCard({ line, onMarkArrived, onRemoveFromLine, onOpenAssignModal, waitlist, onAssignFromWaitlist }) {
+            const [showWaitlistMenu, setShowWaitlistMenu] = useState(null);
+
+            const filledCount = line.positions.filter(p => p && p.arrived).length;
+
+            const handleAssignFromWaitlist = (waitlistItem, positionIndex) => {
+                onAssignFromWaitlist(waitlistItem, line.id, positionIndex);
+                setShowWaitlistMenu(null);
+            };
+
+            return (
+                <div className="line-card">
+                    <div className="line-header">
+                        <div className="line-title">
+                            <div className="line-letter">Line {line.letter}</div>
+                            <div className="line-lead">Lead: {line.lead}</div>
+                        </div>
+                        <div className="line-stats">
+                            <div className="stat">
+                                ✅ {filledCount} / {line.needed}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="line-body">
+                        <div className="positions-grid">
+                            {line.positions.map((position, index) => (
+                                <div 
+                                    key={index}
+                                    className={`position-slot ${position ? 'filled' : ''} ${position?.isCore && !position?.arrived ? 'core' : ''} ${position?.isCore && position?.arrived ? 'core arrived' : ''} ${position?.isNew ? 'new-associate' : ''}`}
+                                >
+                                    <div className="position-number">Position {index + 1}</div>
+                                    
+                                    {position ? (
+                                        <>
+                                            <div className="position-name">
+                                                {position.name}
+                                                {position.isCore && <span className="badge badge-core">CORE</span>}
+                                                {position.isNew && <span className="badge badge-new">NEW</span>}
+                                                {position.arrived && <span className="badge badge-arrived">✓</span>}
+                                            </div>
+                                            {position.notes && (
+                                                <div className="position-notes">{position.notes}</div>
+                                            )}
+                                            <div className="position-actions">
+                                                {position.isCore && !position.arrived && (
+                                                    <button 
+                                                        className="btn btn-success btn-small"
+                                                        onClick={() => onMarkArrived(line.id, position.id)}
+                                                    >
+                                                        ✓ Arrived
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    className="btn btn-danger btn-small"
+                                                    onClick={() => onRemoveFromLine(line.id, index)}
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div style={{ position: 'relative' }}>
+                                            <button 
+                                                className="btn btn-primary btn-small"
+                                                onClick={() => onOpenAssignModal(line.id, index)}
+                                                style={{ width: '100%' }}
+                                            >
+                                                ➕ Assign
+                                            </button>
+                                            {waitlist.length > 0 && (
+                                                <>
+                                                    <button 
+                                                        className="btn btn-secondary btn-small"
+                                                        onClick={() => setShowWaitlistMenu(showWaitlistMenu === index ? null : index)}
+                                                        style={{ width: '100%', marginTop: '4px' }}
+                                                    >
+                                                        From Waitlist ({waitlist.length})
+                                                    </button>
+                                                    {showWaitlistMenu === index && (
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            top: '100%',
+                                                            left: 0,
+                                                            right: 0,
+                                                            background: 'white',
+                                                            border: '2px solid #667eea',
+                                                            borderRadius: '8px',
+                                                            marginTop: '4px',
+                                                            zIndex: 10,
+                                                            maxHeight: '200px',
+                                                            overflowY: 'auto',
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                                        }}>
+                                                            {waitlist.map(item => (
+                                                                <div 
+                                                                    key={item.id}
+                                                                    style={{
+                                                                        padding: '8px 12px',
+                                                                        cursor: 'pointer',
+                                                                        borderBottom: '1px solid #e5e7eb',
+                                                                        display: 'flex',
+                                                                        justifyContent: 'space-between',
+                                                                        alignItems: 'center'
+                                                                    }}
+                                                                    onClick={() => handleAssignFromWaitlist(item, index)}
+                                                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f5f7ff'}
+                                                                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                                                                >
+                                                                    <span>{item.name}</span>
+                                                                    {item.isNew && <span className="badge badge-new">NEW</span>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function SetupView({ onSetupShift, coreAssociates }) {
+            const [lines, setLines] = useState([{ letter: '', lead: '', needed: '' }]);
+
+            const handleAddLine = () => {
+                setLines([...lines, { letter: '', lead: '', needed: '' }]);
+            };
+
+            const handleRemoveLine = (index) => {
+                setLines(lines.filter((_, i) => i !== index));
+            };
+
+            const handleLineChange = (index, field, value) => {
+                const newLines = [...lines];
+                newLines[index][field] = value;
+                setLines(newLines);
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                const validLines = lines.filter(l => l.letter && l.lead && l.needed);
+                if (validLines.length > 0) {
+                    onSetupShift({ lines: validLines });
+                } else {
+                    alert('Please fill in all fields for at least one line.');
+                }
+            };
+
+            const allLeads = Object.keys(coreAssociates);
+
+            return (
+                <form onSubmit={handleSubmit} className="setup-form">
+                    <div className="form-section">
+                        <h3>Configure Production Lines</h3>
+                        {lines.map((line, index) => (
+                            <div key={index} className="form-grid" style={{ marginBottom: '16px', padding: '16px', background: 'white', borderRadius: '8px' }}>
+                                <div className="form-group">
+                                    <label>Line Letter *</label>
+                                    <input 
+                                        type="text"
+                                        value={line.letter}
+                                        onChange={(e) => handleLineChange(index, 'letter', e.target.value.toUpperCase())}
+                                        placeholder="A, B, C..."
+                                        required
+                                        maxLength="2"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Line Lead *</label>
+                                    <input 
+                                        type="text"
+                                        list="leads"
+                                        value={line.lead}
+                                        onChange={(e) => handleLineChange(index, 'lead', e.target.value)}
+                                        placeholder="Lead name"
+                                        required
+                                    />
+                                    <datalist id="leads">
+                                        {allLeads.map(lead => (
+                                            <option key={lead} value={lead} />
+                                        ))}
+                                    </datalist>
+                                </div>
+                                <div className="form-group">
+                                    <label>Associates Needed *</label>
+                                    <input 
+                                        type="number"
+                                        value={line.needed}
+                                        onChange={(e) => handleLineChange(index, 'needed', e.target.value)}
+                                        placeholder="Number"
+                                        required
+                                        min="1"
+                                    />
+                                </div>
+                                {lines.length > 1 && (
+                                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                        <button 
+                                            type="button"
+                                            className="btn btn-danger btn-small"
+                                            onClick={() => handleRemoveLine(index)}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        <button type="button" className="btn btn-secondary" onClick={handleAddLine}>
+                            ➕ Add Another Line
+                        </button>
+                    </div>
+
+                    <button type="submit" className="btn btn-success" style={{ fontSize: '16px', padding: '14px 28px' }}>
+                        🚀 Start Staffing
+                    </button>
+                </form>
+            );
+        }
+
+        function CoreAssociatesView({ coreAssociates, onAddCoreAssociate, onRemoveCoreAssociate }) {
+            const [selectedLead, setSelectedLead] = useState('');
+            const [newLead, setNewLead] = useState('');
+            const [newName, setNewName] = useState('');
+            const [newNotes, setNewNotes] = useState('');
+
+            const allLeads = Object.keys(coreAssociates);
+            const currentLead = selectedLead || newLead;
+            const currentAssociates = coreAssociates[currentLead] || [];
+
+            const handleAddAssociate = (e) => {
+                e.preventDefault();
+                if (currentLead && newName) {
+                    onAddCoreAssociate(currentLead, {
+                        name: newName,
+                        notes: newNotes
+                    });
+                    setNewName('');
+                    setNewNotes('');
+                    if (newLead) {
+                        setSelectedLead(newLead);
+                        setNewLead('');
+                    }
+                }
+            };
+
+            return (
+                <div className="setup-form">
+                    <div className="form-section">
+                        <h3>Manage Core Associates</h3>
+                        <p style={{ color: '#6b7280', marginBottom: '16px' }}>
+                            Core associates are automatically pre-filled when their line lead is assigned to a line.
+                        </p>
+
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>Select Existing Lead</label>
+                                <select 
+                                    value={selectedLead}
+                                    onChange={(e) => {
+                                        setSelectedLead(e.target.value);
+                                        setNewLead('');
+                                    }}
+                                >
+                                    <option value="">-- Select Lead --</option>
+                                    {allLeads.map(lead => (
+                                        <option key={lead} value={lead}>{lead}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={{ textAlign: 'center', padding: '20px 0', color: '#6b7280' }}>OR</div>
+                            <div className="form-group">
+                                <label>New Lead Name</label>
+                                <input 
+                                    type="text"
+                                    value={newLead}
+                                    onChange={(e) => {
+                                        setNewLead(e.target.value);
+                                        setSelectedLead('');
+                                    }}
+                                    placeholder="Enter new lead name"
+                                />
+                            </div>
+                        </div>
+
+                        {currentLead && (
+                            <div style={{ marginTop: '24px' }}>
+                                <h4 style={{ marginBottom: '16px' }}>Core Associates for {currentLead}</h4>
+                                
+                                <form onSubmit={handleAddAssociate}>
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>Associate Name *</label>
+                                            <input 
+                                                type="text"
+                                                value={newName}
+                                                onChange={(e) => setNewName(e.target.value)}
+                                                placeholder="Full name"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Notes (Optional)</label>
+                                            <input 
+                                                type="text"
+                                                value={newNotes}
+                                                onChange={(e) => setNewNotes(e.target.value)}
+                                                placeholder="e.g., Flow Wrapper trained"
+                                            />
+                                        </div>
+                                    </div>
+                                    <button type="submit" className="btn btn-success">
+                                        ➕ Add Core Associate
+                                    </button>
+                                </form>
+
+                                <div className="core-associates-list">
+                                    {currentAssociates.length === 0 ? (
+                                        <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                            No core associates yet for this lead.
+                                        </p>
+                                    ) : (
+                                        currentAssociates.map((associate, index) => (
+                                            <div key={index} className="core-associate-item">
+                                                <div className="core-associate-info">
+                                                    <div className="core-associate-name">{associate.name}</div>
+                                                    {associate.notes && (
+                                                        <div className="core-associate-notes">{associate.notes}</div>
+                                                    )}
+                                                </div>
+                                                <button 
+                                                    className="btn btn-danger btn-small"
+                                                    onClick={() => onRemoveCoreAssociate(currentLead, index)}
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
