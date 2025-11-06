@@ -681,11 +681,22 @@
                     letter: line.letter,
                     lead: line.lead,
                     needed: parseInt(line.needed),
-                    positions: Array(parseInt(line.needed)).fill(null).map((_, idx) => ({
-                        id: Date.now() + Math.random() + idx,
-                        name: '',
-                        isNew: false
-                    }))
+                    positions: Array(parseInt(line.needed)).fill(null).map((_, idx) => {
+                        // Pre-fill with core associates
+                        const coreList = coreAssociates[line.lead] || [];
+                        if (idx < coreList.length) {
+                            return {
+                                id: Date.now() + Math.random() + idx,
+                                name: coreList[idx].name,
+                                isNew: false
+                            };
+                        }
+                        return {
+                            id: Date.now() + Math.random() + idx,
+                            name: '',
+                            isNew: false
+                        };
+                    })
                 }));
 
                 setLines(newLines);
