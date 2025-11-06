@@ -209,11 +209,11 @@
             background: #f9fafb;
             border: 2px solid #d1d5db;
             border-radius: 6px;
-            padding: 8px;
-            min-height: 60px;
+            padding: 6px 8px;
             display: flex;
-            flex-direction: column;
-            gap: 6px;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
         }
 
         .position-slot.filled {
@@ -221,14 +221,21 @@
             border-color: #10b981;
         }
 
+        .position-slot.new-associate {
+            background: #fef9c3;
+            border-color: #eab308;
+        }
+
         .position-number {
-            font-size: 10px;
+            font-size: 12px;
             font-weight: 600;
             color: #6b7280;
+            min-width: 20px;
+            flex-shrink: 0;
         }
 
         .position-input {
-            width: 100%;
+            flex: 1;
             padding: 6px 8px;
             border: 1px solid #d1d5db;
             border-radius: 4px;
@@ -244,13 +251,12 @@
         .position-checkbox {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 11px;
+            flex-shrink: 0;
         }
 
         .position-checkbox input[type="checkbox"] {
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
             cursor: pointer;
         }
 
@@ -980,9 +986,9 @@
                         {line.positions.map((position, index) => (
                             <div
                                 key={position.id}
-                                className={`position-slot ${position.name.trim() ? 'filled' : ''}`}
+                                className={`position-slot ${position.name.trim() ? 'filled' : ''} ${position.isNew ? 'new-associate' : ''}`}
                             >
-                                <div className="position-number">Position {index + 1}</div>
+                                <div className="position-number">{index + 1}</div>
                                 <input
                                     type="text"
                                     className="position-input"
@@ -996,8 +1002,6 @@
                                         checked={position.isNew}
                                         onChange={(e) => onUpdatePosition(line.id, position.id, position.name, e.target.checked)}
                                     />
-                                    <label>New</label>
-                                    {position.isNew && <span className="badge badge-new">NEW</span>}
                                 </div>
                             </div>
                         ))}
