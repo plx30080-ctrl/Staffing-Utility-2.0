@@ -146,7 +146,7 @@
         /* Staffing Layout - Vertical Columns */
         .staffing-layout {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             height: calc(100vh - 200px);
             overflow: hidden;
         }
@@ -154,66 +154,117 @@
         .lines-container {
             flex: 1;
             display: flex;
-            gap: 12px;
+            gap: 10px;
             overflow-x: auto;
             overflow-y: hidden;
-            padding-bottom: 8px;
+            padding-bottom: 12px;
+            padding-right: 4px;
+            scroll-behavior: smooth;
+        }
+
+        /* Better scrollbar styling */
+        .lines-container::-webkit-scrollbar {
+            height: 10px;
+        }
+
+        .lines-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+
+        .lines-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 5px;
+        }
+
+        .lines-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
         .line-column {
-            min-width: 180px;
-            max-width: 220px;
+            min-width: 160px;
+            width: 200px;
+            flex-shrink: 0;
             display: flex;
             flex-direction: column;
             background: white;
             border: 2px solid #e5e7eb;
             border-radius: 8px;
             overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
         .line-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
             flex-shrink: 0;
         }
 
         .line-letter {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .line-lead {
-            font-size: 13px;
+            font-size: 12px;
             opacity: 0.95;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .line-stats {
-            font-size: 11px;
-            margin-top: 4px;
+            font-size: 10px;
+            margin-top: 3px;
             opacity: 0.9;
         }
 
         .positions-list {
             flex: 1;
             overflow-y: auto;
-            padding: 8px;
+            padding: 6px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
+            scroll-behavior: smooth;
+        }
+
+        /* Better scrollbar for positions list */
+        .positions-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .positions-list::-webkit-scrollbar-track {
+            background: #f9fafb;
+        }
+
+        .positions-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .positions-list::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
 
         .position-slot {
             background: #f9fafb;
-            border: 2px solid #d1d5db;
-            border-radius: 6px;
-            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 4px 6px;
             display: flex;
             flex-direction: row;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+
+        .position-slot:hover {
+            border-color: #9ca3af;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
         .position-slot.filled {
@@ -227,19 +278,21 @@
         }
 
         .position-number {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             color: #6b7280;
-            min-width: 20px;
+            min-width: 18px;
             flex-shrink: 0;
+            text-align: center;
         }
 
         .position-input {
             flex: 1;
-            padding: 6px 8px;
+            padding: 5px 6px;
             border: 1px solid #d1d5db;
-            border-radius: 4px;
+            border-radius: 3px;
             font-size: 12px;
+            min-width: 0;
         }
 
         .position-input:focus {
@@ -262,7 +315,7 @@
 
         /* Waitlist Sidebar */
         .waitlist-sidebar {
-            width: 220px;
+            width: 200px;
             display: flex;
             flex-direction: column;
             background: #fffbeb;
@@ -270,41 +323,62 @@
             border-radius: 8px;
             overflow: hidden;
             flex-shrink: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
         .waitlist-header {
             background: #fbbf24;
             color: #78350f;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
             font-weight: 700;
+            font-size: 12px;
             flex-shrink: 0;
         }
 
         .waitlist-items {
             flex: 1;
             overflow-y: auto;
-            padding: 8px;
+            padding: 6px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
+            scroll-behavior: smooth;
+        }
+
+        /* Scrollbar for waitlist */
+        .waitlist-items::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .waitlist-items::-webkit-scrollbar-track {
+            background: #fef9c3;
+        }
+
+        .waitlist-items::-webkit-scrollbar-thumb {
+            background: #fbbf24;
+            border-radius: 4px;
+        }
+
+        .waitlist-items::-webkit-scrollbar-thumb:hover {
+            background: #f59e0b;
         }
 
         .waitlist-item {
             background: white;
             border: 1px solid #fbbf24;
-            border-radius: 6px;
-            padding: 8px;
+            border-radius: 4px;
+            padding: 6px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
         }
 
         .waitlist-input {
             width: 100%;
-            padding: 6px 8px;
+            padding: 5px 6px;
             border: 1px solid #d1d5db;
-            border-radius: 4px;
+            border-radius: 3px;
             font-size: 12px;
         }
 
@@ -681,11 +755,22 @@
                     letter: line.letter,
                     lead: line.lead,
                     needed: parseInt(line.needed),
-                    positions: Array(parseInt(line.needed)).fill(null).map((_, idx) => ({
-                        id: Date.now() + Math.random() + idx,
-                        name: '',
-                        isNew: false
-                    }))
+                    positions: Array(parseInt(line.needed)).fill(null).map((_, idx) => {
+                        // Pre-fill with core associates
+                        const coreList = coreAssociates[line.lead] || [];
+                        if (idx < coreList.length) {
+                            return {
+                                id: Date.now() + Math.random() + idx,
+                                name: coreList[idx].name,
+                                isNew: false
+                            };
+                        }
+                        return {
+                            id: Date.now() + Math.random() + idx,
+                            name: '',
+                            isNew: false
+                        };
+                    })
                 }));
 
                 setLines(newLines);
