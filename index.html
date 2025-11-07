@@ -587,6 +587,34 @@
         .flag-dropdown {
             position: relative;
             display: inline-block;
+            width: 100%;
+        }
+
+        .flag-dropdown-button {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .flag-dropdown-button:hover {
+            border-color: #667eea;
+            background: #f9fafb;
+        }
+
+        .flag-dropdown-button:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .flag-dropdown-content {
@@ -1730,7 +1758,7 @@
             { id: 'low', label: 'Low Performer', className: 'flag-low' }
         ];
 
-        function FlagsDropdown({ flags = [], onChange }) {
+        function FlagsDropdown({ flags = [], onChange, inForm = false }) {
             const [isOpen, setIsOpen] = useState(false);
             const dropdownRef = useRef(null);
 
@@ -1757,30 +1785,61 @@
                 onChange(newFlags);
             };
 
+            const selectedFlagsText = flags.length > 0
+                ? flags.map(fid => AVAILABLE_FLAGS.find(f => f.id === fid)?.label).filter(Boolean).join(', ')
+                : 'Click to select flags...';
+
             return (
                 <div className="flag-dropdown" ref={dropdownRef}>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-small"
-                        onClick={() => setIsOpen(!isOpen)}
-                        style={{ fontSize: '11px' }}
-                    >
-                        Edit Flags ({flags.length})
-                    </button>
+                    {inForm ? (
+                        <button
+                            type="button"
+                            className="flag-dropdown-button"
+                            onClick={() => setIsOpen(!isOpen)}
+                        >
+                            <span style={{ color: flags.length === 0 ? '#9ca3af' : '#111827' }}>
+                                {selectedFlagsText}
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#6b7280' }}>
+                                {isOpen ? '▲' : '▼'}
+                            </span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-small"
+                            onClick={() => setIsOpen(!isOpen)}
+                            style={{ fontSize: '11px' }}
+                        >
+                            Edit Flags ({flags.length})
+                        </button>
+                    )}
                     {isOpen && (
                         <div className="flag-dropdown-content">
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb' }}>
+                                Select Flags:
+                            </div>
                             {AVAILABLE_FLAGS.map(flag => (
                                 <div key={flag.id} className="flag-option">
                                     <input
                                         type="checkbox"
                                         checked={flags.includes(flag.id)}
                                         onChange={() => toggleFlag(flag.id)}
+                                        id={`flag-${flag.id}-${Math.random()}`}
                                     />
-                                    <label style={{ cursor: 'pointer', flex: 1 }} onClick={() => toggleFlag(flag.id)}>
+                                    <label
+                                        style={{ cursor: 'pointer', flex: 1 }}
+                                        onClick={() => toggleFlag(flag.id)}
+                                    >
                                         {flag.label}
                                     </label>
                                 </div>
                             ))}
+                            {flags.length === 0 && (
+                                <div style={{ fontSize: '11px', color: '#9ca3af', padding: '8px', textAlign: 'center', fontStyle: 'italic' }}>
+                                    No flags selected
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1963,8 +2022,8 @@
                                                     />
                                                 </div>
                                                 <div className="form-group">
-                                                    <label>Flags</label>
-                                                    <FlagsDropdown flags={newFlags} onChange={setNewFlags} />
+                                                    <label>Flags / Skills</label>
+                                                    <FlagsDropdown flags={newFlags} onChange={setNewFlags} inForm={true} />
                                                 </div>
                                             </div>
                                             <button type="submit" className="btn btn-success">
