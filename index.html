@@ -12,6 +12,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
+    <!-- SheetJS for XLSX export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
     <style>
         * {
             margin: 0;
@@ -657,6 +660,74 @@
             background: rgba(255,255,255,0.9);
         }
 
+        .search-box {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .lead-section {
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .lead-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .lead-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .view-mode-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+
+        .view-mode-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-mode-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .view-mode-btn:hover:not(.active) {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
         .firebase-config {
             background: #fef3c7;
             border: 1px solid #fbbf24;
@@ -989,21 +1060,86 @@
                 }));
             };
 
-            const handleExport = () => {
-                const data = {
-                    date: currentDate,
-                    shift: currentShift,
-                    lines,
-                    waitlist,
-                    exportedAt: new Date().toISOString()
-                };
+            const handleDeleteLineLead = (lead) => {
+                if (confirm(`Delete line lead "${lead}" and all associated core team members? This cannot be undone.`)) {
+                    setCoreAssociates(prev => {
+                        const updated = { ...prev };
+                        delete updated[lead];
+                        return updated;
+                    });
+                }
+            };
 
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `staffing-${currentDate}-${currentShift}.json`;
-                a.click();
+            const handleExport = () => {
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+
+                // Staffing Sheet
+                const staffingData = [];
+                staffingData.push(['Crescent Staffing Planner - Export']);
+                staffingData.push(['Date:', currentDate]);
+                staffingData.push(['Shift:', currentShift]);
+                staffingData.push(['Exported:', new Date().toLocaleString()]);
+                staffingData.push([]);
+
+                // Header row for staffing
+                staffingData.push(['Line', 'Lead(s)', 'Position #', 'Associate Name', 'New Associate']);
+
+                // Add line data
+                lines.forEach(line => {
+                    const leads = (line.leads || []).join(', ');
+                    line.positions.forEach((position, idx) => {
+                        staffingData.push([
+                            line.letter,
+                            leads,
+                            idx + 1,
+                            position.name || '',
+                            position.isNew ? 'Yes' : 'No'
+                        ]);
+                    });
+                });
+
+                // Add waitlist
+                if (waitlist.length > 0) {
+                    staffingData.push([]);
+                    staffingData.push(['WAITLIST']);
+                    staffingData.push(['#', 'Name', 'New Associate']);
+                    waitlist.forEach((item, idx) => {
+                        staffingData.push([
+                            idx + 1,
+                            item.name || '',
+                            item.isNew ? 'Yes' : 'No'
+                        ]);
+                    });
+                }
+
+                const ws1 = XLSX.utils.aoa_to_sheet(staffingData);
+                XLSX.utils.book_append_sheet(wb, ws1, 'Staffing');
+
+                // Statistics Sheet
+                const totalPositions = lines.reduce((sum, line) => sum + line.needed, 0);
+                const filledPositions = lines.reduce((sum, line) =>
+                    sum + line.positions.filter(p => p.name.trim()).length, 0
+                );
+                const newAssociates = lines.reduce((sum, line) =>
+                    sum + line.positions.filter(p => p.name.trim() && p.isNew).length, 0
+                );
+
+                const statsData = [
+                    ['Statistics'],
+                    ['Total Positions:', totalPositions],
+                    ['Filled Positions:', filledPositions],
+                    ['Empty Positions:', totalPositions - filledPositions],
+                    ['New Associates:', newAssociates],
+                    ['Waitlist Count:', waitlist.filter(w => w.name.trim()).length],
+                    ['Fill Rate:', `${((filledPositions / totalPositions) * 100).toFixed(1)}%`]
+                ];
+
+                const ws2 = XLSX.utils.aoa_to_sheet(statsData);
+                XLSX.utils.book_append_sheet(wb, ws2, 'Statistics');
+
+                // Export file
+                XLSX.writeFile(wb, `staffing-${currentDate}-${currentShift}.xlsx`);
             };
 
             const handleClearAll = () => {
@@ -1102,6 +1238,7 @@
                                 onAddCoreAssociate={handleAddCoreAssociate}
                                 onRemoveCoreAssociate={handleRemoveCoreAssociate}
                                 onUpdateCoreAssociate={handleUpdateCoreAssociate}
+                                onDeleteLineLead={handleDeleteLineLead}
                             />
                         )}
                     </div>
@@ -1650,49 +1787,66 @@
             );
         }
 
-        function CoreAssociatesView({ coreAssociates, onAddCoreAssociate, onRemoveCoreAssociate, onUpdateCoreAssociate }) {
+        function CoreAssociatesView({ coreAssociates, onAddCoreAssociate, onRemoveCoreAssociate, onUpdateCoreAssociate, onDeleteLineLead }) {
+            const [viewMode, setViewMode] = useState('byLead'); // 'byLead' or 'all'
             const [selectedLead, setSelectedLead] = useState('');
             const [newLead, setNewLead] = useState('');
             const [newName, setNewName] = useState('');
             const [newFlags, setNewFlags] = useState([]);
             const [filterFlags, setFilterFlags] = useState([]);
             const [sortBy, setSortBy] = useState('name'); // 'name' or flag id
+            const [searchQuery, setSearchQuery] = useState('');
 
             const allLeads = Object.keys(coreAssociates);
-            const currentLead = selectedLead || newLead;
-            const currentAssociates = coreAssociates[currentLead] || [];
 
-            // Convert old notes format to flags format
-            const associatesWithFlags = currentAssociates.map(assoc => {
-                if (!assoc.flags && assoc.notes) {
-                    // Legacy support: convert notes to empty flags array
-                    return { ...assoc, flags: [] };
+            // Get all associates across all leads for "All" view
+            const getAllAssociates = () => {
+                const all = [];
+                Object.entries(coreAssociates).forEach(([lead, associates]) => {
+                    associates.forEach((assoc, index) => {
+                        all.push({
+                            ...assoc,
+                            lead: lead,
+                            leadIndex: index,
+                            flags: assoc.flags || []
+                        });
+                    });
+                });
+                return all;
+            };
+
+            const getFilteredAssociates = () => {
+                let associates = viewMode === 'all' ? getAllAssociates() : (coreAssociates[selectedLead || newLead] || []).map(a => ({ ...a, flags: a.flags || [] }));
+
+                // Apply search filter
+                if (searchQuery.trim()) {
+                    associates = associates.filter(assoc =>
+                        assoc.name.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
                 }
-                return { ...assoc, flags: assoc.flags || [] };
-            });
 
-            // Filter associates
-            let filteredAssociates = associatesWithFlags;
-            if (filterFlags.length > 0) {
-                filteredAssociates = associatesWithFlags.filter(assoc =>
-                    filterFlags.every(flag => assoc.flags.includes(flag))
-                );
-            }
-
-            // Sort associates
-            filteredAssociates = [...filteredAssociates].sort((a, b) => {
-                if (sortBy === 'name') {
-                    return a.name.localeCompare(b.name);
-                } else {
-                    // Sort by flag (those with the flag first)
-                    const aHasFlag = a.flags.includes(sortBy) ? 1 : 0;
-                    const bHasFlag = b.flags.includes(sortBy) ? 1 : 0;
-                    return bHasFlag - aHasFlag;
+                // Apply flag filters
+                if (filterFlags.length > 0) {
+                    associates = associates.filter(assoc =>
+                        filterFlags.every(flag => (assoc.flags || []).includes(flag))
+                    );
                 }
-            });
+
+                // Sort
+                return [...associates].sort((a, b) => {
+                    if (sortBy === 'name') {
+                        return a.name.localeCompare(b.name);
+                    } else {
+                        const aHasFlag = (a.flags || []).includes(sortBy) ? 1 : 0;
+                        const bHasFlag = (b.flags || []).includes(sortBy) ? 1 : 0;
+                        return bHasFlag - aHasFlag;
+                    }
+                });
+            };
 
             const handleAddAssociate = (e) => {
                 e.preventDefault();
+                const currentLead = selectedLead || newLead;
                 if (currentLead && newName) {
                     onAddCoreAssociate(currentLead, {
                         name: newName,
@@ -1707,9 +1861,11 @@
                 }
             };
 
-            const handleUpdateAssociateFlags = (index, newFlags) => {
-                onUpdateCoreAssociate(currentLead, index, { flags: newFlags });
+            const handleUpdateAssociateFlags = (lead, index, newFlags) => {
+                onUpdateCoreAssociate(lead, index, { flags: newFlags });
             };
+
+            const filteredAssociates = getFilteredAssociates();
 
             return (
                 <div className="setup-form">
@@ -1719,102 +1875,151 @@
                             Core associates are team members assigned to specific line leads. Tag them with skills and attributes.
                         </p>
 
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label>Select Existing Lead</label>
-                                <select
-                                    value={selectedLead}
-                                    onChange={(e) => {
-                                        setSelectedLead(e.target.value);
-                                        setNewLead('');
-                                    }}
-                                >
-                                    <option value="">-- Select Lead --</option>
-                                    {allLeads.map(lead => (
-                                        <option key={lead} value={lead}>{lead}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div style={{ textAlign: 'center', padding: '16px 0', color: '#6b7280' }}>OR</div>
-                            <div className="form-group">
-                                <label>New Lead Name</label>
-                                <input
-                                    type="text"
-                                    value={newLead}
-                                    onChange={(e) => {
-                                        setNewLead(e.target.value);
-                                        setSelectedLead('');
-                                    }}
-                                    placeholder="Enter new lead name"
-                                />
-                            </div>
+                        {/* View Mode Toggle */}
+                        <div className="view-mode-toggle">
+                            <button
+                                className={`view-mode-btn ${viewMode === 'byLead' ? 'active' : ''}`}
+                                onClick={() => setViewMode('byLead')}
+                            >
+                                By Line Lead
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'all' ? 'active' : ''}`}
+                                onClick={() => setViewMode('all')}
+                            >
+                                All Associates
+                            </button>
                         </div>
 
-                        {currentLead && (
-                            <div style={{ marginTop: '20px' }}>
-                                <h4 style={{ marginBottom: '12px', fontSize: '14px' }}>Core Associates for {currentLead}</h4>
+                        {/* Search Box */}
+                        {viewMode === 'all' && (
+                            <input
+                                type="text"
+                                className="search-box"
+                                placeholder="Search associates by name..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        )}
 
-                                <form onSubmit={handleAddAssociate}>
-                                    <div className="form-grid">
-                                        <div className="form-group">
-                                            <label>Associate Name *</label>
-                                            <input
-                                                type="text"
-                                                value={newName}
-                                                onChange={(e) => setNewName(e.target.value)}
-                                                placeholder="Full name"
-                                                required
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Flags</label>
-                                            <FlagsDropdown flags={newFlags} onChange={setNewFlags} />
-                                        </div>
-                                    </div>
-                                    <button type="submit" className="btn btn-success">
-                                        + Add Core Associate
-                                    </button>
-                                </form>
-
-                                {currentAssociates.length > 0 && (
-                                    <div className="filter-controls">
-                                        <div className="filter-row">
-                                            <span className="filter-label">Sort by:</span>
-                                            <select
-                                                value={sortBy}
-                                                onChange={(e) => setSortBy(e.target.value)}
-                                                style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-                                            >
-                                                <option value="name">Name</option>
-                                                {AVAILABLE_FLAGS.map(flag => (
-                                                    <option key={flag.id} value={flag.id}>{flag.label}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="filter-row" style={{ marginTop: '8px' }}>
-                                            <span className="filter-label">Filter by flags:</span>
-                                            {AVAILABLE_FLAGS.map(flag => (
-                                                <label key={flag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={filterFlags.includes(flag.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setFilterFlags([...filterFlags, flag.id]);
-                                                            } else {
-                                                                setFilterFlags(filterFlags.filter(f => f !== flag.id));
-                                                            }
-                                                        }}
-                                                    />
-                                                    {flag.label}
-                                                </label>
+                        {/* By Lead View */}
+                        {viewMode === 'byLead' && (
+                            <>
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label>Select Existing Lead</label>
+                                        <select
+                                            value={selectedLead}
+                                            onChange={(e) => {
+                                                setSelectedLead(e.target.value);
+                                                setNewLead('');
+                                            }}
+                                        >
+                                            <option value="">-- Select Lead --</option>
+                                            {allLeads.map(lead => (
+                                                <option key={lead} value={lead}>{lead}</option>
                                             ))}
+                                        </select>
+                                    </div>
+                                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#6b7280' }}>OR</div>
+                                    <div className="form-group">
+                                        <label>New Lead Name</label>
+                                        <input
+                                            type="text"
+                                            value={newLead}
+                                            onChange={(e) => {
+                                                setNewLead(e.target.value);
+                                                setSelectedLead('');
+                                            }}
+                                            placeholder="Enter new lead name"
+                                        />
+                                    </div>
+                                </div>
+
+                                {(selectedLead || newLead) && (
+                                    <div style={{ marginTop: '20px' }}>
+                                        <div className="lead-header">
+                                            <h4 className="lead-title">Core Associates for {selectedLead || newLead}</h4>
+                                            {selectedLead && (
+                                                <button
+                                                    className="btn btn-danger btn-small"
+                                                    onClick={() => onDeleteLineLead(selectedLead)}
+                                                >
+                                                    Delete Line Lead
+                                                </button>
+                                            )}
                                         </div>
+
+                                        <form onSubmit={handleAddAssociate}>
+                                            <div className="form-grid">
+                                                <div className="form-group">
+                                                    <label>Associate Name *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={newName}
+                                                        onChange={(e) => setNewName(e.target.value)}
+                                                        placeholder="Full name"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>Flags</label>
+                                                    <FlagsDropdown flags={newFlags} onChange={setNewFlags} />
+                                                </div>
+                                            </div>
+                                            <button type="submit" className="btn btn-success">
+                                                + Add Core Associate
+                                            </button>
+                                        </form>
                                     </div>
                                 )}
+                            </>
+                        )}
 
+                        {/* Filters and Sort */}
+                        {((viewMode === 'byLead' && (selectedLead || newLead) && (coreAssociates[selectedLead || newLead] || []).length > 0) || (viewMode === 'all' && getAllAssociates().length > 0)) && (
+                            <div className="filter-controls">
+                                <div className="filter-row">
+                                    <span className="filter-label">Sort by:</span>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                                    >
+                                        <option value="name">Name</option>
+                                        {AVAILABLE_FLAGS.map(flag => (
+                                            <option key={flag.id} value={flag.id}>{flag.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="filter-row" style={{ marginTop: '8px' }}>
+                                    <span className="filter-label">Filter by flags:</span>
+                                    {AVAILABLE_FLAGS.map(flag => (
+                                        <label key={flag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={filterFlags.includes(flag.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setFilterFlags([...filterFlags, flag.id]);
+                                                    } else {
+                                                        setFilterFlags(filterFlags.filter(f => f !== flag.id));
+                                                    }
+                                                }}
+                                            />
+                                            {flag.label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Associates List */}
+                        {viewMode === 'byLead' ? (
+                            // By Lead View
+                            (selectedLead || newLead) && (
                                 <div className="core-associates-list">
-                                    {currentAssociates.length === 0 ? (
+                                    {(coreAssociates[selectedLead || newLead] || []).length === 0 ? (
                                         <p style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '12px' }}>
                                             No core associates yet for this lead.
                                         </p>
@@ -1823,11 +2028,10 @@
                                             No associates match the selected filters.
                                         </p>
                                     ) : (
-                                        filteredAssociates.map((associate, filteredIndex) => {
-                                            // Find the original index
-                                            const originalIndex = currentAssociates.findIndex(a => a.name === associate.name);
+                                        filteredAssociates.map((associate, idx) => {
+                                            const originalIndex = (coreAssociates[selectedLead || newLead] || []).findIndex(a => a.name === associate.name);
                                             return (
-                                                <div key={originalIndex} className="core-associate-item">
+                                                <div key={idx} className="core-associate-item">
                                                     <div className="core-associate-info">
                                                         <div className="core-associate-name">{associate.name}</div>
                                                         <div className="core-associate-flags">
@@ -1847,12 +2051,12 @@
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
                                                         <FlagsDropdown
-                                                            flags={associate.flags}
-                                                            onChange={(newFlags) => handleUpdateAssociateFlags(originalIndex, newFlags)}
+                                                            flags={associate.flags || []}
+                                                            onChange={(newFlags) => handleUpdateAssociateFlags(selectedLead || newLead, originalIndex, newFlags)}
                                                         />
                                                         <button
                                                             className="btn btn-danger btn-small"
-                                                            onClick={() => onRemoveCoreAssociate(currentLead, originalIndex)}
+                                                            onClick={() => onRemoveCoreAssociate(selectedLead || newLead, originalIndex)}
                                                         >
                                                             Remove
                                                         </button>
@@ -1862,6 +2066,73 @@
                                         })
                                     )}
                                 </div>
+                            )
+                        ) : (
+                            // All Associates View
+                            <div>
+                                {allLeads.length === 0 ? (
+                                    <p style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '12px', textAlign: 'center', padding: '20px' }}>
+                                        No line leads created yet. Switch to "By Line Lead" view to add your first lead and associates.
+                                    </p>
+                                ) : filteredAssociates.length === 0 ? (
+                                    <p style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '12px', textAlign: 'center', padding: '20px' }}>
+                                        {searchQuery ? 'No associates match your search.' : 'No associates match the selected filters.'}
+                                    </p>
+                                ) : (
+                                    allLeads.map(lead => {
+                                        const leadAssociates = filteredAssociates.filter(a => a.lead === lead);
+                                        if (leadAssociates.length === 0) return null;
+
+                                        return (
+                                            <div key={lead} className="lead-section">
+                                                <div className="lead-header">
+                                                    <h4 className="lead-title">{lead}</h4>
+                                                    <button
+                                                        className="btn btn-danger btn-small"
+                                                        onClick={() => onDeleteLineLead(lead)}
+                                                    >
+                                                        Delete Lead
+                                                    </button>
+                                                </div>
+                                                <div className="core-associates-list">
+                                                    {leadAssociates.map((associate, idx) => (
+                                                        <div key={idx} className="core-associate-item">
+                                                            <div className="core-associate-info">
+                                                                <div className="core-associate-name">{associate.name}</div>
+                                                                <div className="core-associate-flags">
+                                                                    {associate.flags && associate.flags.length > 0 ? (
+                                                                        associate.flags.map(flagId => {
+                                                                            const flag = AVAILABLE_FLAGS.find(f => f.id === flagId);
+                                                                            return flag ? (
+                                                                                <span key={flagId} className={`flag-badge ${flag.className}`}>
+                                                                                    {flag.label}
+                                                                                </span>
+                                                                            ) : null;
+                                                                        })
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>No flags</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                                                <FlagsDropdown
+                                                                    flags={associate.flags || []}
+                                                                    onChange={(newFlags) => handleUpdateAssociateFlags(associate.lead, associate.leadIndex, newFlags)}
+                                                                />
+                                                                <button
+                                                                    className="btn btn-danger btn-small"
+                                                                    onClick={() => onRemoveCoreAssociate(associate.lead, associate.leadIndex)}
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         )}
                     </div>
