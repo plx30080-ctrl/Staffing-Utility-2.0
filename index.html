@@ -195,6 +195,7 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative;
         }
 
         .line-header {
@@ -587,6 +588,34 @@
         .flag-dropdown {
             position: relative;
             display: inline-block;
+            width: 100%;
+        }
+
+        .flag-dropdown-button {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .flag-dropdown-button:hover {
+            border-color: #667eea;
+            background: #f9fafb;
+        }
+
+        .flag-dropdown-button:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .flag-dropdown-content {
@@ -658,6 +687,49 @@
             font-size: 11px;
             margin-top: 4px;
             background: rgba(255,255,255,0.9);
+        }
+
+        .line-column.cut {
+            opacity: 0.6;
+            border-color: #ef4444;
+            background: #fee2e2;
+        }
+
+        .line-column.cut .line-header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .cut-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #dc2626;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            z-index: 10;
+        }
+
+        .position-slot.dragging {
+            opacity: 0.4;
+        }
+
+        .position-slot.drag-over {
+            background: #e0e7ff;
+            border-color: #667eea;
+            border-width: 2px;
+        }
+
+        .waitlist-item.dragging {
+            opacity: 0.4;
+        }
+
+        .waitlist-item.drag-over {
+            background: #e0e7ff;
+            border-color: #667eea;
         }
 
         .search-box {
@@ -931,6 +1003,7 @@
                         letter: line.letter,
                         leads: leads,
                         needed: parseInt(line.needed),
+                        isCut: false,
                         positions: Array(parseInt(line.needed)).fill(null).map((_, idx) => {
                             // Pre-fill with core associates from all leads
                             if (idx < allCoreAssociates.length) {
@@ -994,6 +1067,7 @@
                     letter: '',
                     leads: [],
                     needed: 5,
+                    isCut: false,
                     positions: Array(5).fill(null).map((_, idx) => ({
                         id: Date.now() + Math.random() + idx,
                         name: '',
@@ -1001,6 +1075,96 @@
                     }))
                 };
                 setLines(prev => [...prev, newLine]);
+            };
+
+            const handleToggleCutLine = (lineId) => {
+                setLines(prev => prev.map(line => {
+                    if (line.id === lineId) {
+                        const newCutStatus = !line.isCut;
+
+                        // If marking as cut, move all assigned associates to waitlist
+                        if (newCutStatus) {
+                            const assignedAssociates = line.positions
+                                .filter(p => p.name.trim())
+                                .map(p => ({
+                                    id: Date.now() + Math.random(),
+                                    name: p.name,
+                                    isNew: p.isNew
+                                }));
+
+                            if (assignedAssociates.length > 0) {
+                                setWaitlist(prev => [...prev, ...assignedAssociates]);
+                            }
+
+                            // Clear all positions
+                            return {
+                                ...line,
+                                isCut: true,
+                                positions: line.positions.map(p => ({ ...p, name: '', isNew: false }))
+                            };
+                        }
+
+                        return { ...line, isCut: newCutStatus };
+                    }
+                    return line;
+                }));
+            };
+
+            const handleDragStart = (e, source) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('application/json', JSON.stringify(source));
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            };
+
+            const handleDrop = (e, target) => {
+                e.preventDefault();
+                const source = JSON.parse(e.dataTransfer.getData('application/json'));
+
+                // Don't allow drops on cut lines
+                if (target.type === 'position') {
+                    const targetLine = lines.find(l => l.id === target.lineId);
+                    if (targetLine && targetLine.isCut) {
+                        return;
+                    }
+                }
+
+                // Handle different drop scenarios
+                if (source.type === 'waitlist' && target.type === 'position') {
+                    // Move from waitlist to position
+                    const waitlistItem = waitlist.find(w => w.id === source.id);
+                    if (waitlistItem) {
+                        handleUpdatePosition(target.lineId, target.positionId, waitlistItem.name, waitlistItem.isNew);
+                        handleRemoveWaitlistItem(source.id);
+                    }
+                } else if (source.type === 'position' && target.type === 'waitlist') {
+                    // Move from position to waitlist
+                    const sourceLine = lines.find(l => l.id === source.lineId);
+                    const sourcePosition = sourceLine?.positions.find(p => p.id === source.positionId);
+                    if (sourcePosition && sourcePosition.name.trim()) {
+                        setWaitlist(prev => [...prev, {
+                            id: Date.now() + Math.random(),
+                            name: sourcePosition.name,
+                            isNew: sourcePosition.isNew
+                        }]);
+                        handleUpdatePosition(source.lineId, source.positionId, '', false);
+                    }
+                } else if (source.type === 'position' && target.type === 'position') {
+                    // Swap positions
+                    const sourceLine = lines.find(l => l.id === source.lineId);
+                    const targetLine = lines.find(l => l.id === target.lineId);
+                    const sourcePosition = sourceLine?.positions.find(p => p.id === source.positionId);
+                    const targetPosition = targetLine?.positions.find(p => p.id === target.positionId);
+
+                    if (sourcePosition && targetPosition) {
+                        // Swap the names and isNew status
+                        handleUpdatePosition(target.lineId, target.positionId, sourcePosition.name, sourcePosition.isNew);
+                        handleUpdatePosition(source.lineId, source.positionId, targetPosition.name, targetPosition.isNew);
+                    }
+                }
             };
 
             const handleRemoveLine = (lineId) => {
@@ -1218,6 +1382,10 @@
                                 onAddLine={handleAddLine}
                                 onRemoveLine={handleRemoveLine}
                                 onUpdateLine={handleUpdateLine}
+                                onToggleCutLine={handleToggleCutLine}
+                                onDragStart={handleDragStart}
+                                onDragOver={handleDragOver}
+                                onDrop={handleDrop}
                             />
                         )}
 
@@ -1258,7 +1426,11 @@
             onRemoveWaitlistItem,
             onAddLine,
             onRemoveLine,
-            onUpdateLine
+            onUpdateLine,
+            onToggleCutLine,
+            onDragStart,
+            onDragOver,
+            onDrop
         }) {
             if (lines.length === 0) {
                 return (
@@ -1269,11 +1441,14 @@
                 );
             }
 
-            const totalPositions = lines.reduce((sum, line) => sum + line.needed, 0);
-            const filledPositions = lines.reduce((sum, line) =>
+            // Calculate stats excluding cut lines
+            const activeLines = lines.filter(line => !line.isCut);
+            const cutLines = lines.filter(line => line.isCut);
+            const totalPositions = activeLines.reduce((sum, line) => sum + line.needed, 0);
+            const filledPositions = activeLines.reduce((sum, line) =>
                 sum + line.positions.filter(p => p.name.trim()).length, 0
             );
-            const newAssociates = lines.reduce((sum, line) =>
+            const newAssociates = activeLines.reduce((sum, line) =>
                 sum + line.positions.filter(p => p.name.trim() && p.isNew).length, 0
             );
 
@@ -1293,6 +1468,7 @@
                         <div>
                             <strong style={{ color: '#10b981', fontSize: '14px' }}>{filledPositions}</strong> / {totalPositions} filled
                             {newAssociates > 0 && <span style={{ marginLeft: '12px', color: '#3b82f6' }}>• {newAssociates} new</span>}
+                            {cutLines.length > 0 && <span style={{ marginLeft: '12px', color: '#ef4444' }}>• {cutLines.length} cut</span>}
                             {waitlist.filter(w => w.name.trim()).length > 0 && <span style={{ marginLeft: '12px', color: '#f59e0b' }}>• {waitlist.filter(w => w.name.trim()).length} waiting</span>}
                         </div>
                         {saveStatus && (
@@ -1309,6 +1485,10 @@
                                     onUpdatePosition={onUpdatePosition}
                                     onUpdateLine={onUpdateLine}
                                     onRemoveLine={onRemoveLine}
+                                    onToggleCutLine={onToggleCutLine}
+                                    onDragStart={onDragStart}
+                                    onDragOver={onDragOver}
+                                    onDrop={onDrop}
                                 />
                             ))}
                             <div className="line-column" style={{ minWidth: '120px', width: '120px', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: '#f9fafb' }} onClick={onAddLine}>
@@ -1319,7 +1499,11 @@
                             </div>
                         </div>
 
-                        <div className="waitlist-sidebar">
+                        <div
+                            className="waitlist-sidebar"
+                            onDragOver={onDragOver}
+                            onDrop={(e) => onDrop(e, { type: 'waitlist' })}
+                        >
                             <div className="waitlist-header">
                                 WAITLIST ({waitlist.filter(w => w.name.trim()).length})
                                 <button
@@ -1332,7 +1516,13 @@
                             </div>
                             <div className="waitlist-items">
                                 {waitlist.map((item, idx) => (
-                                    <div key={item.id} className="waitlist-item">
+                                    <div
+                                        key={item.id}
+                                        className="waitlist-item"
+                                        draggable={item.name.trim() !== ''}
+                                        onDragStart={(e) => onDragStart(e, { type: 'waitlist', id: item.id })}
+                                        style={{ cursor: item.name.trim() ? 'grab' : 'default' }}
+                                    >
                                         <div style={{ fontSize: '10px', color: '#6b7280', fontWeight: '600' }}>
                                             #{idx + 1}
                                         </div>
@@ -1372,7 +1562,7 @@
             );
         }
 
-        function LineColumn({ line, onUpdatePosition, onUpdateLine, onRemoveLine }) {
+        function LineColumn({ line, onUpdatePosition, onUpdateLine, onRemoveLine, onToggleCutLine, onDragStart, onDragOver, onDrop }) {
             const [isEditing, setIsEditing] = useState(false);
             const [editLetter, setEditLetter] = useState(line.letter);
             const [editLeads, setEditLeads] = useState((line.leads || []).join(', '));
@@ -1399,7 +1589,8 @@
             };
 
             return (
-                <div className="line-column">
+                <div className={`line-column ${line.isCut ? 'cut' : ''}`} style={{ position: 'relative' }}>
+                    {line.isCut && <div className="cut-badge">CUT</div>}
                     <div className="line-header">
                         {!isEditing ? (
                             <>
@@ -1409,6 +1600,13 @@
                                 </div>
                                 <div className="line-stats">{filledCount} / {line.needed} filled</div>
                                 <div className="line-edit-controls">
+                                    <button
+                                        className="btn btn-secondary btn-small"
+                                        onClick={() => onToggleCutLine(line.id)}
+                                        style={{ fontSize: '10px', padding: '3px 6px', background: line.isCut ? '#10b981' : '#ef4444', color: 'white', border: 'none' }}
+                                    >
+                                        {line.isCut ? 'Restore' : 'Cut'}
+                                    </button>
                                     <button
                                         className="btn btn-secondary btn-small"
                                         onClick={() => setIsEditing(true)}
@@ -1475,6 +1673,11 @@
                             <div
                                 key={position.id}
                                 className={`position-slot ${position.name.trim() ? 'filled' : ''} ${position.isNew ? 'new-associate' : ''}`}
+                                draggable={position.name.trim() !== '' && !line.isCut}
+                                onDragStart={(e) => onDragStart(e, { type: 'position', lineId: line.id, positionId: position.id })}
+                                onDragOver={onDragOver}
+                                onDrop={(e) => onDrop(e, { type: 'position', lineId: line.id, positionId: position.id })}
+                                style={{ cursor: position.name.trim() && !line.isCut ? 'grab' : 'default' }}
                             >
                                 <div className="position-number">{index + 1}</div>
                                 <input
@@ -1483,12 +1686,14 @@
                                     value={position.name}
                                     onChange={(e) => onUpdatePosition(line.id, position.id, e.target.value, position.isNew)}
                                     placeholder="Name..."
+                                    disabled={line.isCut}
                                 />
                                 <div className="position-checkbox">
                                     <input
                                         type="checkbox"
                                         checked={position.isNew}
                                         onChange={(e) => onUpdatePosition(line.id, position.id, position.name, e.target.checked)}
+                                        disabled={line.isCut}
                                     />
                                 </div>
                             </div>
@@ -1730,7 +1935,7 @@
             { id: 'low', label: 'Low Performer', className: 'flag-low' }
         ];
 
-        function FlagsDropdown({ flags = [], onChange }) {
+        function FlagsDropdown({ flags = [], onChange, inForm = false }) {
             const [isOpen, setIsOpen] = useState(false);
             const dropdownRef = useRef(null);
 
@@ -1757,30 +1962,61 @@
                 onChange(newFlags);
             };
 
+            const selectedFlagsText = flags.length > 0
+                ? flags.map(fid => AVAILABLE_FLAGS.find(f => f.id === fid)?.label).filter(Boolean).join(', ')
+                : 'Click to select flags...';
+
             return (
                 <div className="flag-dropdown" ref={dropdownRef}>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-small"
-                        onClick={() => setIsOpen(!isOpen)}
-                        style={{ fontSize: '11px' }}
-                    >
-                        Edit Flags ({flags.length})
-                    </button>
+                    {inForm ? (
+                        <button
+                            type="button"
+                            className="flag-dropdown-button"
+                            onClick={() => setIsOpen(!isOpen)}
+                        >
+                            <span style={{ color: flags.length === 0 ? '#9ca3af' : '#111827' }}>
+                                {selectedFlagsText}
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#6b7280' }}>
+                                {isOpen ? '▲' : '▼'}
+                            </span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-small"
+                            onClick={() => setIsOpen(!isOpen)}
+                            style={{ fontSize: '11px' }}
+                        >
+                            Edit Flags ({flags.length})
+                        </button>
+                    )}
                     {isOpen && (
                         <div className="flag-dropdown-content">
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb' }}>
+                                Select Flags:
+                            </div>
                             {AVAILABLE_FLAGS.map(flag => (
                                 <div key={flag.id} className="flag-option">
                                     <input
                                         type="checkbox"
                                         checked={flags.includes(flag.id)}
                                         onChange={() => toggleFlag(flag.id)}
+                                        id={`flag-${flag.id}-${Math.random()}`}
                                     />
-                                    <label style={{ cursor: 'pointer', flex: 1 }} onClick={() => toggleFlag(flag.id)}>
+                                    <label
+                                        style={{ cursor: 'pointer', flex: 1 }}
+                                        onClick={() => toggleFlag(flag.id)}
+                                    >
                                         {flag.label}
                                     </label>
                                 </div>
                             ))}
+                            {flags.length === 0 && (
+                                <div style={{ fontSize: '11px', color: '#9ca3af', padding: '8px', textAlign: 'center', fontStyle: 'italic' }}>
+                                    No flags selected
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1963,8 +2199,8 @@
                                                     />
                                                 </div>
                                                 <div className="form-group">
-                                                    <label>Flags</label>
-                                                    <FlagsDropdown flags={newFlags} onChange={setNewFlags} />
+                                                    <label>Flags / Skills</label>
+                                                    <FlagsDropdown flags={newFlags} onChange={setNewFlags} inForm={true} />
                                                 </div>
                                             </div>
                                             <button type="submit" className="btn btn-success">
