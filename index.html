@@ -10,7 +10,7 @@
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
     <!-- SheetJS for XLSX export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -1018,9 +1018,9 @@
             const configuredKeys = Object.values(FIREBASE_CONFIG).filter(v => !v.startsWith('YOUR_'));
             if (configuredKeys.length === Object.keys(FIREBASE_CONFIG).length) {
                 firebase.initializeApp(FIREBASE_CONFIG);
-                db = firebase.firestore();
+                db = firebase.database();  // Using Realtime Database instead of Firestore
                 isFirebaseConfigured = true;
-                console.log('Firebase initialized successfully');
+                console.log('Firebase Realtime Database initialized successfully');
             } else {
                 console.warn('Firebase not configured. Using localStorage only.');
             }
@@ -1055,10 +1055,10 @@
                     // Try Firebase first
                     if (isFirebaseConfigured && db) {
                         try {
-                            const doc = await db.collection('settings').doc('coreAssociates').get();
-                            if (doc.exists) {
-                                const data = doc.data();
-                                console.log('Loaded core associates from Firebase');
+                            const snapshot = await db.ref('settings/coreAssociates').once('value');
+                            if (snapshot.exists()) {
+                                const data = snapshot.val();
+                                console.log('Loaded core associates from Firebase Realtime Database');
                                 setCoreAssociates(data.associates || {});
                                 return;
                             }
@@ -1080,11 +1080,11 @@
 
                 // Also save to Firebase
                 if (isFirebaseConfigured && db && Object.keys(coreAssociates).length > 0) {
-                    db.collection('settings').doc('coreAssociates').set({
+                    db.ref('settings/coreAssociates').set({
                         associates: coreAssociates,
                         lastUpdated: new Date().toISOString()
                     }).then(() => {
-                        console.log('Core associates saved to Firebase');
+                        console.log('Core associates saved to Firebase Realtime Database');
                     }).catch(error => {
                         console.error('Error saving core associates to Firebase:', error);
                     });
@@ -1129,26 +1129,15 @@
                 if (isFirebaseConfigured && db) {
                     try {
                         const docId = `${currentDate}_${currentShift}`;
-                        await db.collection('staffing').doc(docId).set(staffingData);
-                        console.log('Saved to Firebase:', docId);
+                        await db.ref('staffing/' + docId).set(staffingData);
+                        console.log('Saved to Firebase Realtime Database:', docId);
                         setSaveStatus('Saved to cloud ✓');
                         setFirebaseStatus('connected');
                     } catch (error) {
                         console.error('Firebase save error:', error);
                         console.error('Error details:', error.code, error.message);
-
-                        // Check if it's a permission error (Firestore API not enabled)
-                        if (error.code === 'permission-denied' || error.message.includes('has not been used')) {
-                            setFirebaseStatus('disconnected');
-                            setSaveStatus('Cloud sync disabled - Enable Firestore API in Firebase Console');
-                            alert('Firebase Error: Cloud Firestore API needs to be enabled.\n\n' +
-                                  'Please visit the Firebase Console:\n' +
-                                  'https://console.firebase.google.com/project/staffingtool-1ab4f/firestore\n\n' +
-                                  'And enable the Cloud Firestore API to sync data across devices.');
-                        } else {
-                            setFirebaseStatus('disconnected');
-                            setSaveStatus('Error: ' + error.message);
-                        }
+                        setFirebaseStatus('disconnected');
+                        setSaveStatus('Error: ' + error.message);
                     }
                 } else {
                     setSaveStatus('Saved locally');
@@ -1165,10 +1154,10 @@
                 if (isFirebaseConfigured && db) {
                     try {
                         const docId = `${date}_${shift}`;
-                        const doc = await db.collection('staffing').doc(docId).get();
-                        if (doc.exists) {
-                            const data = doc.data();
-                            console.log('Loaded from Firebase:', docId, data);
+                        const snapshot = await db.ref('staffing/' + docId).once('value');
+                        if (snapshot.exists()) {
+                            const data = snapshot.val();
+                            console.log('Loaded from Firebase Realtime Database:', docId, data);
                             setLines(data.lines || []);
                             setWaitlist(data.waitlist || []);
                             return;
@@ -2395,14 +2384,16 @@
                 // Load from Firebase if configured
                 if (isFirebaseConfigured && db) {
                     try {
-                        // Get all documents without orderBy to avoid index requirements
-                        const snapshot = await db.collection('staffing').get();
-                        snapshot.forEach(doc => {
-                            const data = doc.data();
-                            reportsList.push({ id: doc.id, ...data, syncedToCloud: true });
-                            firebaseReportIds.add(doc.id);
-                        });
-                        console.log('Loaded from Firebase:', reportsList.length, 'reports');
+                        const snapshot = await db.ref('staffing').once('value');
+                        if (snapshot.exists()) {
+                            const staffingData = snapshot.val();
+                            Object.keys(staffingData).forEach(docId => {
+                                const data = staffingData[docId];
+                                reportsList.push({ id: docId, ...data, syncedToCloud: true });
+                                firebaseReportIds.add(docId);
+                            });
+                        }
+                        console.log('Loaded from Firebase Realtime Database:', reportsList.length, 'reports');
                     } catch (error) {
                         console.error('Error loading Firebase reports:', error);
                         alert('Error loading from Firebase: ' + error.message);
