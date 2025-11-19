@@ -990,15 +990,46 @@
             const [saveStatus, setSaveStatus] = useState('');
             const saveTimeoutRef = useRef(null);
 
-            // Load core associates from localStorage
+            // Load core associates from Firebase and localStorage
             useEffect(() => {
-                const savedCoreAssociates = storage.load('coreAssociates', {});
-                setCoreAssociates(savedCoreAssociates);
+                const loadCoreAssociates = async () => {
+                    // Try Firebase first
+                    if (isFirebaseConfigured && db) {
+                        try {
+                            const doc = await db.collection('settings').doc('coreAssociates').get();
+                            if (doc.exists) {
+                                const data = doc.data();
+                                console.log('Loaded core associates from Firebase');
+                                setCoreAssociates(data.associates || {});
+                                return;
+                            }
+                        } catch (error) {
+                            console.error('Error loading core associates from Firebase:', error);
+                        }
+                    }
+
+                    // Fallback to localStorage
+                    const savedCoreAssociates = storage.load('coreAssociates', {});
+                    setCoreAssociates(savedCoreAssociates);
+                };
+                loadCoreAssociates();
             }, []);
 
-            // Save core associates to localStorage
+            // Save core associates to both localStorage and Firebase
             useEffect(() => {
                 storage.save('coreAssociates', coreAssociates);
+
+                // Also save to Firebase
+                if (isFirebaseConfigured && db && Object.keys(coreAssociates).length > 0) {
+                    db.collection('settings').doc('coreAssociates').set({
+                        associates: coreAssociates,
+                        lastUpdated: new Date().toISOString()
+                    }).then(() => {
+                        console.log('Core associates saved to Firebase');
+                    }).catch(error => {
+                        console.error('Error saving core associates to Firebase:', error);
+                    });
+                }
             }, [coreAssociates]);
 
             // Auto-save functionality
@@ -1033,16 +1064,19 @@
 
                 // Always save to localStorage
                 storage.save(`staffing_${currentDate}_${currentShift}`, staffingData);
+                console.log('Saved to localStorage:', `staffing_${currentDate}_${currentShift}`);
 
                 // Save to Firebase if configured
                 if (isFirebaseConfigured && db) {
                     try {
                         const docId = `${currentDate}_${currentShift}`;
                         await db.collection('staffing').doc(docId).set(staffingData);
+                        console.log('Saved to Firebase:', docId);
                         setSaveStatus('Saved to cloud ✓');
                     } catch (error) {
                         console.error('Firebase save error:', error);
-                        setSaveStatus('Saved locally only');
+                        console.error('Error details:', error.code, error.message);
+                        setSaveStatus('Error: ' + error.message);
                     }
                 } else {
                     setSaveStatus('Saved locally');
@@ -1053,6 +1087,8 @@
             };
 
             const loadStaffingData = async (date, shift) => {
+                console.log('Loading staffing data for:', date, shift);
+
                 // Try Firebase first
                 if (isFirebaseConfigured && db) {
                     try {
@@ -1060,21 +1096,27 @@
                         const doc = await db.collection('staffing').doc(docId).get();
                         if (doc.exists) {
                             const data = doc.data();
+                            console.log('Loaded from Firebase:', docId, data);
                             setLines(data.lines || []);
                             setWaitlist(data.waitlist || []);
                             return;
+                        } else {
+                            console.log('Document not found in Firebase:', docId);
                         }
                     } catch (error) {
                         console.error('Firebase load error:', error);
+                        alert('Error loading from Firebase: ' + error.message);
                     }
                 }
 
                 // Fallback to localStorage
                 const localData = storage.load(`staffing_${date}_${shift}`, null);
                 if (localData) {
+                    console.log('Loaded from localStorage:', localData);
                     setLines(localData.lines || []);
                     setWaitlist(localData.waitlist || []);
                 } else {
+                    console.log('No data found');
                     setLines([]);
                     setWaitlist([]);
                 }
@@ -2280,12 +2322,16 @@
                 // Load from Firebase if configured
                 if (isFirebaseConfigured && db) {
                     try {
-                        const snapshot = await db.collection('staffing').orderBy('date', 'desc').limit(50).get();
+                        // Get all documents without orderBy to avoid index requirements
+                        const snapshot = await db.collection('staffing').get();
                         snapshot.forEach(doc => {
-                            reportsList.push({ id: doc.id, ...doc.data() });
+                            const data = doc.data();
+                            reportsList.push({ id: doc.id, ...data });
                         });
+                        console.log('Loaded from Firebase:', reportsList.length, 'reports');
                     } catch (error) {
                         console.error('Error loading Firebase reports:', error);
+                        alert('Error loading from Firebase: ' + error.message);
                     }
                 }
 
@@ -2301,12 +2347,13 @@
                     }
                 });
 
-                // Sort by date and shift
+                // Sort by date and shift (client-side)
                 reportsList.sort((a, b) => {
                     if (a.date !== b.date) return b.date.localeCompare(a.date);
                     return a.shift.localeCompare(b.shift);
                 });
 
+                console.log('Total reports loaded:', reportsList.length);
                 setReports(reportsList);
                 setLoading(false);
             };
