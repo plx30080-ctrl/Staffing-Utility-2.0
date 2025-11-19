@@ -1397,69 +1397,225 @@
                 // Create workbook
                 const wb = XLSX.utils.book_new();
 
-                // Staffing Sheet
-                const staffingData = [];
-                staffingData.push(['Crescent Staffing Planner - Export']);
-                staffingData.push(['Date:', currentDate]);
-                staffingData.push(['Shift:', currentShift]);
-                staffingData.push(['Exported:', new Date().toLocaleString()]);
-                staffingData.push([]);
-
-                // Header row for staffing
-                staffingData.push(['Line', 'Lead(s)', 'Position #', 'Associate Name', 'New Associate']);
-
-                // Add line data
-                lines.forEach(line => {
-                    const leads = (line.leads || []).join(', ');
-                    line.positions.forEach((position, idx) => {
-                        staffingData.push([
-                            line.letter,
-                            leads,
-                            idx + 1,
-                            position.name || '',
-                            position.isNew ? 'Yes' : 'No'
-                        ]);
-                    });
-                });
-
-                // Add waitlist
-                if (waitlist.length > 0) {
-                    staffingData.push([]);
-                    staffingData.push(['WAITLIST']);
-                    staffingData.push(['#', 'Name', 'New Associate']);
-                    waitlist.forEach((item, idx) => {
-                        staffingData.push([
-                            idx + 1,
-                            item.name || '',
-                            item.isNew ? 'Yes' : 'No'
-                        ]);
-                    });
-                }
-
-                const ws1 = XLSX.utils.aoa_to_sheet(staffingData);
-                XLSX.utils.book_append_sheet(wb, ws1, 'Staffing');
-
-                // Statistics Sheet
-                const totalPositions = lines.reduce((sum, line) => sum + line.needed, 0);
-                const filledPositions = lines.reduce((sum, line) =>
+                // Calculate stats
+                const activeLines = lines.filter(line => !line.isCut);
+                const cutLines = lines.filter(line => line.isCut);
+                const totalPositions = activeLines.reduce((sum, line) => sum + line.needed, 0);
+                const filledPositions = activeLines.reduce((sum, line) =>
                     sum + line.positions.filter(p => p.name.trim()).length, 0
                 );
-                const newAssociates = lines.reduce((sum, line) =>
+                const newAssociates = activeLines.reduce((sum, line) =>
                     sum + line.positions.filter(p => p.name.trim() && p.isNew).length, 0
                 );
 
-                const statsData = [
-                    ['Statistics'],
-                    ['Total Positions:', totalPositions],
-                    ['Filled Positions:', filledPositions],
-                    ['Empty Positions:', totalPositions - filledPositions],
-                    ['New Associates:', newAssociates],
-                    ['Waitlist Count:', waitlist.filter(w => w.name.trim()).length],
-                    ['Fill Rate:', `${((filledPositions / totalPositions) * 100).toFixed(1)}%`]
-                ];
+                // Build data in column-based layout (like the tool)
+                const data = [];
 
-                const ws2 = XLSX.utils.aoa_to_sheet(statsData);
-                XLSX.utils.book_append_sheet(wb, ws2, 'Statistics');
+                // Title row
+                data.push(['Crescent Staffing Planner']);
+
+                // Info row
+                data.push([`${currentDate} - ${currentShift} Shift`, '', '', '', `Exported: ${new Date().toLocaleString()}`]);
+
+                // Stats row
+                data.push([`${filledPositions} / ${totalPositions} filled`, `${newAssociates} new`, cutLines.length > 0 ? `${cutLines.length} cut` : '', waitlist.filter(w => w.name.trim()).length > 0 ? `${waitlist.filter(w => w.name.trim()).length} waiting` : '']);
+
+                // Empty row
+                data.push([]);
+
+                // Find max positions needed for any line
+                const maxPositions = Math.max(...lines.map(l => l.positions.length), waitlist.length);
+
+                // Header row - Line letters and waitlist
+                const headerRow = [];
+                lines.forEach(line => {
+                    headerRow.push(`Line ${line.letter}${line.isCut ? ' (CUT)' : ''}`);
+                    headerRow.push(''); // Spacing column
+                });
+                headerRow.push('WAITLIST');
+                data.push(headerRow);
+
+                // Subheader row - Line leads
+                const subheaderRow = [];
+                lines.forEach(line => {
+                    const leads = (line.leads || []).join(', ');
+                    subheaderRow.push(leads || 'No lead');
+                    subheaderRow.push(''); // Spacing column
+                });
+                subheaderRow.push('');
+                data.push(subheaderRow);
+
+                // Position rows
+                for (let i = 0; i < maxPositions; i++) {
+                    const row = [];
+                    lines.forEach(line => {
+                        const position = line.positions[i];
+                        if (position) {
+                            const name = position.name || '';
+                            const marker = position.isNew ? ' ⭐' : '';
+                            row.push(name + marker);
+                        } else {
+                            row.push('');
+                        }
+                        row.push(''); // Spacing column
+                    });
+
+                    // Add waitlist item
+                    const waitlistItem = waitlist[i];
+                    if (waitlistItem) {
+                        const marker = waitlistItem.isNew ? ' ⭐' : '';
+                        row.push((waitlistItem.name || '') + marker);
+                    } else {
+                        row.push('');
+                    }
+
+                    data.push(row);
+                }
+
+                // Create worksheet
+                const ws = XLSX.utils.aoa_to_sheet(data);
+
+                // Set column widths
+                const colWidths = [];
+                lines.forEach(() => {
+                    colWidths.push({ wch: 20 }); // Line column
+                    colWidths.push({ wch: 2 });  // Spacing column
+                });
+                colWidths.push({ wch: 20 }); // Waitlist column
+                ws['!cols'] = colWidths;
+
+                // Apply styling
+                const range = XLSX.utils.decode_range(ws['!ref']);
+
+                // Style title (row 0)
+                for (let C = range.s.c; C <= range.e.c; C++) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+                    if (!ws[cellAddress]) continue;
+                    ws[cellAddress].s = {
+                        font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+                        fill: { fgColor: { rgb: "667EEA" } },
+                        alignment: { horizontal: "center", vertical: "center" }
+                    };
+                }
+
+                // Style info row (row 1)
+                for (let C = range.s.c; C <= range.e.c; C++) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 1, c: C });
+                    if (!ws[cellAddress]) continue;
+                    ws[cellAddress].s = {
+                        font: { bold: true, sz: 11 },
+                        fill: { fgColor: { rgb: "F3F4F6" } },
+                        alignment: { horizontal: "center" }
+                    };
+                }
+
+                // Style stats row (row 2)
+                for (let C = range.s.c; C <= range.e.c; C++) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 2, c: C });
+                    if (!ws[cellAddress]) continue;
+                    ws[cellAddress].s = {
+                        font: { sz: 10 },
+                        fill: { fgColor: { rgb: "E5E7EB" } },
+                        alignment: { horizontal: "center" }
+                    };
+                }
+
+                // Style line headers (row 4)
+                let colIndex = 0;
+                lines.forEach((line, idx) => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 4, c: colIndex });
+                    if (ws[cellAddress]) {
+                        ws[cellAddress].s = {
+                            font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
+                            fill: { fgColor: { rgb: line.isCut ? "EF4444" : "667EEA" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    }
+                    colIndex += 2; // Skip spacing column
+                });
+
+                // Style waitlist header
+                const waitlistHeaderCell = XLSX.utils.encode_cell({ r: 4, c: colIndex });
+                if (ws[waitlistHeaderCell]) {
+                    ws[waitlistHeaderCell].s = {
+                        font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
+                        fill: { fgColor: { rgb: "F59E0B" } },
+                        alignment: { horizontal: "center", vertical: "center" }
+                    };
+                }
+
+                // Style lead names (row 5)
+                colIndex = 0;
+                lines.forEach(() => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 5, c: colIndex });
+                    if (ws[cellAddress]) {
+                        ws[cellAddress].s = {
+                            font: { italic: true, sz: 10 },
+                            fill: { fgColor: { rgb: "F9FAFB" } },
+                            alignment: { horizontal: "center" }
+                        };
+                    }
+                    colIndex += 2;
+                });
+
+                // Style position cells (starting from row 6)
+                for (let R = 6; R <= range.e.r; R++) {
+                    colIndex = 0;
+                    lines.forEach((line) => {
+                        const cellAddress = XLSX.utils.encode_cell({ r: R, c: colIndex });
+                        if (ws[cellAddress]) {
+                            const cellValue = ws[cellAddress].v || '';
+                            const isNew = cellValue.includes('⭐');
+                            const isEmpty = !cellValue.trim() || cellValue.trim() === '⭐';
+
+                            ws[cellAddress].s = {
+                                fill: {
+                                    fgColor: {
+                                        rgb: isEmpty ? "FFFFFF" :
+                                             isNew ? "DBEAFE" :
+                                             line.isCut ? "FEE2E2" :
+                                             "F0FDF4"
+                                    }
+                                },
+                                border: {
+                                    top: { style: "thin", color: { rgb: "E5E7EB" } },
+                                    bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+                                    left: { style: "thin", color: { rgb: "E5E7EB" } },
+                                    right: { style: "thin", color: { rgb: "E5E7EB" } }
+                                },
+                                alignment: { vertical: "center" }
+                            };
+                        }
+                        colIndex += 2;
+                    });
+
+                    // Style waitlist cells
+                    const waitlistCell = XLSX.utils.encode_cell({ r: R, c: colIndex });
+                    if (ws[waitlistCell]) {
+                        const cellValue = ws[waitlistCell].v || '';
+                        const isNew = cellValue.includes('⭐');
+                        const isEmpty = !cellValue.trim() || cellValue.trim() === '⭐';
+
+                        ws[waitlistCell].s = {
+                            fill: {
+                                fgColor: {
+                                    rgb: isEmpty ? "FFFFFF" :
+                                         isNew ? "DBEAFE" :
+                                         "FEF3C7"
+                                }
+                            },
+                            border: {
+                                top: { style: "thin", color: { rgb: "E5E7EB" } },
+                                bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+                                left: { style: "thin", color: { rgb: "E5E7EB" } },
+                                right: { style: "thin", color: { rgb: "E5E7EB" } }
+                            },
+                            alignment: { vertical: "center" }
+                        };
+                    }
+                }
+
+                XLSX.utils.book_append_sheet(wb, ws, 'Staffing');
 
                 // Export file
                 XLSX.writeFile(wb, `staffing-${currentDate}-${currentShift}.xlsx`);
