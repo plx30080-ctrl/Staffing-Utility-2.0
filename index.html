@@ -1041,12 +1041,13 @@
         function App() {
             const [activeTab, setActiveTab] = useState('setup');
             const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
-            const [currentShift, setCurrentShift] = useState('Day');
+            const [currentShift, setCurrentShift] = useState('1st');
             const [lines, setLines] = useState([]);
             const [waitlist, setWaitlist] = useState([]);
             const [coreAssociates, setCoreAssociates] = useState({});
             const [saveStatus, setSaveStatus] = useState('');
             const [firebaseStatus, setFirebaseStatus] = useState(isFirebaseConfigured ? 'connected' : 'offline');
+            const [isLocked, setIsLocked] = useState(false);
             const saveTimeoutRef = useRef(null);
 
             // Load core associates from Firebase and localStorage
@@ -1118,6 +1119,7 @@
                     shift: currentShift,
                     lines: lines,
                     waitlist: waitlist,
+                    locked: isLocked,
                     lastUpdated: new Date().toISOString()
                 };
 
@@ -1160,6 +1162,7 @@
                             console.log('Loaded from Firebase Realtime Database:', docId, data);
                             setLines(data.lines || []);
                             setWaitlist(data.waitlist || []);
+                            setIsLocked(data.locked || false);
                             return;
                         } else {
                             console.log('Document not found in Firebase:', docId);
@@ -1176,16 +1179,25 @@
                     console.log('Loaded from localStorage:', localData);
                     setLines(localData.lines || []);
                     setWaitlist(localData.waitlist || []);
+                    setIsLocked(localData.locked || false);
                 } else {
                     console.log('No data found');
                     setLines([]);
                     setWaitlist([]);
+                    setIsLocked(false);
                 }
             };
 
             const handleSetupShift = (shiftData) => {
                 setCurrentDate(shiftData.date);
                 setCurrentShift(shiftData.shift);
+
+                // If loading existing sheet, just load the data
+                if (shiftData.loadExisting) {
+                    loadStaffingData(shiftData.date, shiftData.shift);
+                    setActiveTab('staffing');
+                    return;
+                }
 
                 const newLines = shiftData.lines.map(line => {
                     // Support both old (single lead) and new (multiple leads) format
@@ -1731,6 +1743,20 @@
                 }
             };
 
+            const handleToggleLock = () => {
+                if (!isLocked) {
+                    // Locking
+                    if (confirm('Lock this staffing sheet? Once locked, no edits can be made until it is unlocked.')) {
+                        setIsLocked(true);
+                    }
+                } else {
+                    // Unlocking
+                    if (confirm('Unlock this staffing sheet? This will allow edits to be made.')) {
+                        setIsLocked(false);
+                    }
+                }
+            };
+
             return (
                 <div className="container">
                     <div className="header">
@@ -1793,6 +1819,8 @@
                                 currentDate={currentDate}
                                 currentShift={currentShift}
                                 saveStatus={saveStatus}
+                                isLocked={isLocked}
+                                onToggleLock={handleToggleLock}
                                 onUpdatePosition={handleUpdatePosition}
                                 onUpdateWaitlistItem={handleUpdateWaitlistItem}
                                 onAddWaitlistItem={handleAddWaitlistItem}
@@ -1839,6 +1867,8 @@
             currentDate,
             currentShift,
             saveStatus,
+            isLocked,
+            onToggleLock,
             onUpdatePosition,
             onUpdateWaitlistItem,
             onAddWaitlistItem,
@@ -1923,6 +1953,11 @@
                     <div className="stats-bar">
                         <div>
                             <strong>{currentDate}</strong> - {currentShift} Shift
+                            {isLocked && (
+                                <span style={{ marginLeft: '12px', padding: '4px 8px', background: '#fee2e2', color: '#991b1b', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
+                                    🔒 LOCKED
+                                </span>
+                            )}
                         </div>
                         <div>
                             <strong style={{ color: '#10b981', fontSize: '14px' }}>{filledPositions}</strong> / {totalPositions} filled
@@ -1930,9 +1965,18 @@
                             {cutLines.length > 0 && <span style={{ marginLeft: '12px', color: '#ef4444' }}>• {cutLines.length} cut</span>}
                             {waitlist.filter(w => w.name.trim()).length > 0 && <span style={{ marginLeft: '12px', color: '#f59e0b' }}>• {waitlist.filter(w => w.name.trim()).length} waiting</span>}
                         </div>
-                        {saveStatus && (
-                            <div className="save-status">{saveStatus}</div>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <button
+                                className={`btn ${isLocked ? 'btn-danger' : 'btn-secondary'}`}
+                                onClick={onToggleLock}
+                                style={{ fontSize: '12px', padding: '6px 12px' }}
+                            >
+                                {isLocked ? '🔓 Unlock' : '🔒 Lock'}
+                            </button>
+                            {saveStatus && (
+                                <div className="save-status">{saveStatus}</div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="staffing-layout">
@@ -1941,6 +1985,7 @@
                                 <LineColumn
                                     key={line.id}
                                     line={line}
+                                    isLocked={isLocked}
                                     onUpdatePosition={onUpdatePosition}
                                     onUpdateLine={onUpdateLine}
                                     onRemoveLine={onRemoveLine}
@@ -1950,7 +1995,7 @@
                                     onDrop={onDrop}
                                 />
                             ))}
-                            <div className="line-column" style={{ minWidth: '120px', width: '120px', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: '#f9fafb' }} onClick={onAddLine}>
+                            <div className="line-column" style={{ minWidth: '120px', width: '120px', justifyContent: 'center', alignItems: 'center', cursor: isLocked ? 'not-allowed' : 'pointer', background: '#f9fafb', opacity: isLocked ? 0.5 : 1 }} onClick={isLocked ? null : onAddLine}>
                                 <div style={{ textAlign: 'center', color: '#667eea', fontSize: '14px', fontWeight: '600' }}>
                                     <div style={{ fontSize: '32px', marginBottom: '8px' }}>+</div>
                                     <div>Add Line</div>
@@ -1960,8 +2005,8 @@
 
                         <div
                             className="waitlist-sidebar"
-                            onDragOver={onDragOver}
-                            onDrop={(e) => onDrop(e, { type: 'waitlist' })}
+                            onDragOver={isLocked ? null : onDragOver}
+                            onDrop={(e) => isLocked ? e.preventDefault() : onDrop(e, { type: 'waitlist' })}
                         >
                             <div className="waitlist-header">
                                 WAITLIST ({waitlist.filter(w => w.name.trim()).length})
@@ -1969,13 +2014,16 @@
                                     <button
                                         className="btn btn-primary btn-small"
                                         onClick={() => setIsQuickAddOpen(true)}
-                                        style={{ fontSize: '11px' }}
+                                        disabled={isLocked}
+                                        style={{ fontSize: '11px', opacity: isLocked ? 0.5 : 1 }}
                                     >
                                         Quick Add
                                     </button>
                                     <button
                                         className="btn btn-success btn-small"
                                         onClick={onAddWaitlistItem}
+                                        disabled={isLocked}
+                                        style={{ opacity: isLocked ? 0.5 : 1 }}
                                     >
                                         + Add
                                     </button>
@@ -1986,9 +2034,9 @@
                                     <div
                                         key={item.id}
                                         className="waitlist-item"
-                                        draggable={item.name.trim() !== ''}
-                                        onDragStart={(e) => onDragStart(e, { type: 'waitlist', id: item.id })}
-                                        style={{ cursor: item.name.trim() ? 'grab' : 'default' }}
+                                        draggable={!isLocked && item.name.trim() !== ''}
+                                        onDragStart={(e) => isLocked ? e.preventDefault() : onDragStart(e, { type: 'waitlist', id: item.id })}
+                                        style={{ cursor: isLocked ? 'not-allowed' : (item.name.trim() ? 'grab' : 'default'), opacity: isLocked ? 0.7 : 1 }}
                                     >
                                         <div style={{ fontSize: '10px', color: '#6b7280', fontWeight: '600' }}>
                                             #{idx + 1}
@@ -1999,6 +2047,7 @@
                                             value={item.name}
                                             onChange={(e) => onUpdateWaitlistItem(item.id, e.target.value, item.isNew)}
                                             placeholder="Type name..."
+                                            disabled={isLocked}
                                         />
                                         <div className="waitlist-controls">
                                             <input
@@ -2006,11 +2055,14 @@
                                                 checked={item.isNew}
                                                 onChange={(e) => onUpdateWaitlistItem(item.id, item.name, e.target.checked)}
                                                 style={{ width: '14px', height: '14px' }}
+                                                disabled={isLocked}
                                             />
                                             <label style={{ fontSize: '11px', flex: 1 }}>New</label>
                                             <button
                                                 className="btn btn-danger btn-small"
                                                 onClick={() => onRemoveWaitlistItem(item.id)}
+                                                disabled={isLocked}
+                                                style={{ opacity: isLocked ? 0.5 : 1 }}
                                             >
                                                 ×
                                             </button>
@@ -2100,7 +2152,7 @@
             );
         }
 
-        function LineColumn({ line, onUpdatePosition, onUpdateLine, onRemoveLine, onToggleCutLine, onDragStart, onDragOver, onDrop }) {
+        function LineColumn({ line, isLocked, onUpdatePosition, onUpdateLine, onRemoveLine, onToggleCutLine, onDragStart, onDragOver, onDrop }) {
             const [isEditing, setIsEditing] = useState(false);
             const [editLetter, setEditLetter] = useState(line.letter);
             const [editLeads, setEditLeads] = useState((line.leads || []).join(', '));
@@ -2141,21 +2193,24 @@
                                     <button
                                         className="btn btn-secondary btn-small"
                                         onClick={() => onToggleCutLine(line.id)}
-                                        style={{ fontSize: '10px', padding: '3px 6px', background: line.isCut ? '#10b981' : '#ef4444', color: 'white', border: 'none' }}
+                                        disabled={isLocked}
+                                        style={{ fontSize: '10px', padding: '3px 6px', background: line.isCut ? '#10b981' : '#ef4444', color: 'white', border: 'none', opacity: isLocked ? 0.5 : 1 }}
                                     >
                                         {line.isCut ? 'Restore' : 'Cut'}
                                     </button>
                                     <button
                                         className="btn btn-secondary btn-small"
                                         onClick={() => setIsEditing(true)}
-                                        style={{ fontSize: '10px', padding: '3px 6px' }}
+                                        disabled={isLocked}
+                                        style={{ fontSize: '10px', padding: '3px 6px', opacity: isLocked ? 0.5 : 1 }}
                                     >
                                         Edit
                                     </button>
                                     <button
                                         className="btn btn-danger btn-small"
                                         onClick={() => onRemoveLine(line.id)}
-                                        style={{ fontSize: '10px', padding: '3px 6px' }}
+                                        disabled={isLocked}
+                                        style={{ fontSize: '10px', padding: '3px 6px', opacity: isLocked ? 0.5 : 1 }}
                                     >
                                         Remove
                                     </button>
@@ -2211,11 +2266,11 @@
                             <div
                                 key={position.id}
                                 className={`position-slot ${position.name.trim() ? 'filled' : ''} ${position.isNew ? 'new-associate' : ''}`}
-                                draggable={position.name.trim() !== '' && !line.isCut}
-                                onDragStart={(e) => onDragStart(e, { type: 'position', lineId: line.id, positionId: position.id })}
+                                draggable={!isLocked && position.name.trim() !== '' && !line.isCut}
+                                onDragStart={(e) => isLocked ? e.preventDefault() : onDragStart(e, { type: 'position', lineId: line.id, positionId: position.id })}
                                 onDragOver={onDragOver}
-                                onDrop={(e) => onDrop(e, { type: 'position', lineId: line.id, positionId: position.id })}
-                                style={{ cursor: position.name.trim() && !line.isCut ? 'grab' : 'default' }}
+                                onDrop={(e) => isLocked ? e.preventDefault() : onDrop(e, { type: 'position', lineId: line.id, positionId: position.id })}
+                                style={{ cursor: isLocked ? 'not-allowed' : (position.name.trim() && !line.isCut ? 'grab' : 'default'), opacity: isLocked ? 0.7 : 1 }}
                             >
                                 <div className="position-number">{index + 1}</div>
                                 <input
@@ -2224,14 +2279,14 @@
                                     value={position.name}
                                     onChange={(e) => onUpdatePosition(line.id, position.id, e.target.value, position.isNew)}
                                     placeholder="Name..."
-                                    disabled={line.isCut}
+                                    disabled={line.isCut || isLocked}
                                 />
                                 <div className="position-checkbox">
                                     <input
                                         type="checkbox"
                                         checked={position.isNew}
                                         onChange={(e) => onUpdatePosition(line.id, position.id, position.name, e.target.checked)}
-                                        disabled={line.isCut}
+                                        disabled={line.isCut || isLocked}
                                     />
                                 </div>
                             </div>
@@ -2260,8 +2315,44 @@
                 setLines(newLines);
             };
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
+
+                // Check if staffing sheet already exists for this date/shift
+                const docId = `${date}_${shift}`;
+                let existsInFirebase = false;
+                let existsInLocalStorage = false;
+
+                // Check Firebase
+                if (isFirebaseConfigured && db) {
+                    try {
+                        const snapshot = await db.ref('staffing/' + docId).once('value');
+                        existsInFirebase = snapshot.exists();
+                    } catch (error) {
+                        console.error('Error checking Firebase:', error);
+                    }
+                }
+
+                // Check localStorage
+                const localData = storage.load(`staffing_${date}_${shift}`, null);
+                existsInLocalStorage = localData !== null;
+
+                // If exists, prevent creating a new one
+                if (existsInFirebase || existsInLocalStorage) {
+                    const location = existsInFirebase ? 'cloud' : 'local storage';
+                    const confirmed = confirm(
+                        `A staffing sheet already exists for ${date} - ${shift} Shift (saved in ${location}).\n\n` +
+                        `Only one staffing sheet can exist per date and shift to prevent data conflicts.\n\n` +
+                        `Would you like to load the existing sheet instead?`
+                    );
+
+                    if (confirmed) {
+                        // Load the existing sheet instead
+                        onSetupShift({ date, shift, loadExisting: true });
+                    }
+                    return; // Don't create a new sheet
+                }
+
                 const validLines = lines.filter(l => l.letter && l.lead && l.needed).map(l => ({
                     ...l,
                     leads: l.lead.split(',').map(lead => lead.trim()).filter(lead => lead)
@@ -2292,8 +2383,8 @@
                             <div className="form-group">
                                 <label>Shift *</label>
                                 <select value={shift} onChange={(e) => setShift(e.target.value)} required>
-                                    <option>Day</option>
-                                    <option>Night</option>
+                                    <option>1st</option>
+                                    <option>2nd</option>
                                     <option>Swing</option>
                                 </select>
                             </div>
