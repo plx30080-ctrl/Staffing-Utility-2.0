@@ -1854,6 +1854,7 @@
                                 onRemoveCoreAssociate={handleRemoveCoreAssociate}
                                 onUpdateCoreAssociate={handleUpdateCoreAssociate}
                                 onDeleteLineLead={handleDeleteLineLead}
+                                firebaseStatus={firebaseStatus}
                             />
                         )}
                     </div>
@@ -2670,7 +2671,7 @@
             );
         }
 
-        function CoreAssociatesView({ coreAssociates, onAddCoreAssociate, onRemoveCoreAssociate, onUpdateCoreAssociate, onDeleteLineLead }) {
+        function CoreAssociatesView({ coreAssociates, onAddCoreAssociate, onRemoveCoreAssociate, onUpdateCoreAssociate, onDeleteLineLead, firebaseStatus }) {
             const [viewMode, setViewMode] = useState('byLead'); // 'byLead' or 'all'
             const [selectedLead, setSelectedLead] = useState('');
             const [newLead, setNewLead] = useState('');
