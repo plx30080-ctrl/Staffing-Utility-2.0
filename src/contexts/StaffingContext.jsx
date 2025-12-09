@@ -21,6 +21,7 @@ export function StaffingProvider({ children }) {
   const [waitlist, setWaitlist] = useState([])
   const [coreAssociates, setCoreAssociates] = useState({})
   const [activeAssociates, setActiveAssociates] = useState({})
+  const [dailyAssignments, setDailyAssignments] = useState({}) // { employeeNumber: { line, leads, position, ... } }
   const [saveStatus, setSaveStatus] = useState('')
   const [firebaseStatus, setFirebaseStatus] = useState(isFirebaseConfigured ? 'connected' : 'offline')
   const [isLocked, setIsLocked] = useState(false)
@@ -68,6 +69,31 @@ export function StaffingProvider({ children }) {
     loadActiveAssociates()
   }, [])
 
+  // Load daily assignments when date/shift changes
+  useEffect(() => {
+    const loadDailyAssignments = async () => {
+      if (!currentDate || !currentShift) return
+
+      if (isFirebaseConfigured && db) {
+        try {
+          const path = `${DB_PATHS.ASSIGNMENTS}/${currentDate}/${currentShift}`
+          const data = await loadData(path)
+          if (data) {
+            setDailyAssignments(data)
+            return
+          }
+        } catch (error) {
+          console.error('Error loading daily assignments:', error)
+        }
+      }
+      // Fallback to localStorage
+      const key = `assignments_${currentDate}_${currentShift}`
+      const savedAssignments = storage.load(key, {})
+      setDailyAssignments(savedAssignments)
+    }
+    loadDailyAssignments()
+  }, [currentDate, currentShift])
+
   // Subscribe to real-time waitlist updates
   useEffect(() => {
     if (!isFirebaseConfigured || !db || !currentDate || !currentShift) return
@@ -111,6 +137,19 @@ export function StaffingProvider({ children }) {
       saveData(DB_PATHS.ACTIVE_ASSOCIATES, activeAssociates).catch(console.error)
     }
   }, [activeAssociates])
+
+  // Save daily assignments
+  useEffect(() => {
+    if (!currentDate || !currentShift) return
+
+    const key = `assignments_${currentDate}_${currentShift}`
+    storage.save(key, dailyAssignments)
+
+    if (isFirebaseConfigured && db && Object.keys(dailyAssignments).length > 0) {
+      const path = `${DB_PATHS.ASSIGNMENTS}/${currentDate}/${currentShift}`
+      saveData(path, dailyAssignments).catch(console.error)
+    }
+  }, [dailyAssignments, currentDate, currentShift])
 
   // Auto-save functionality
   useEffect(() => {
@@ -220,6 +259,42 @@ export function StaffingProvider({ children }) {
     setActiveAssociates(newAssociates)
   }, [])
 
+  // Add a daily assignment
+  const addDailyAssignment = useCallback((employeeNumber, assignmentData) => {
+    setDailyAssignments(prev => ({
+      ...prev,
+      [employeeNumber]: {
+        ...assignmentData,
+        employeeNumber,
+        assignedDate: new Date().toISOString()
+      }
+    }))
+  }, [])
+
+  // Remove a daily assignment
+  const removeDailyAssignment = useCallback((employeeNumber) => {
+    setDailyAssignments(prev => {
+      const updated = { ...prev }
+      delete updated[employeeNumber]
+      return updated
+    })
+  }, [])
+
+  // Bulk update daily assignments
+  const updateDailyAssignments = useCallback((newAssignments) => {
+    setDailyAssignments(newAssignments)
+  }, [])
+
+  // Get assignment for an employee
+  const getAssignmentForEmployee = useCallback((employeeNumber) => {
+    return dailyAssignments[employeeNumber] || null
+  }, [dailyAssignments])
+
+  // Clear all daily assignments for current shift
+  const clearDailyAssignments = useCallback(() => {
+    setDailyAssignments({})
+  }, [])
+
   // Add to waitlist
   const addToWaitlist = useCallback((name, isNew = false, employeeNumber = null) => {
     const newItem = {
@@ -267,6 +342,7 @@ export function StaffingProvider({ children }) {
     waitlist,
     coreAssociates,
     activeAssociates,
+    dailyAssignments,
     saveStatus,
     firebaseStatus,
     isLocked,
@@ -286,6 +362,11 @@ export function StaffingProvider({ children }) {
     addActiveAssociate,
     removeActiveAssociate,
     updateActiveAssociates,
+    addDailyAssignment,
+    removeDailyAssignment,
+    updateDailyAssignments,
+    getAssignmentForEmployee,
+    clearDailyAssignments,
     addToWaitlist,
     isEmployeeAlreadyPresent,
 

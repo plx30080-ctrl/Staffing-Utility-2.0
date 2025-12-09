@@ -1,14 +1,22 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useMemo } from 'react'
 import { useStaffing } from '../contexts/StaffingContext'
 import { useAssignmentParser } from '../hooks/useAssignmentParser'
+import * as assignmentService from '../services/assignmentService'
 import '../styles/assignments.css'
 
 export function AssignmentsView() {
   const {
     activeAssociates,
+    dailyAssignments,
     updateActiveAssociates,
     addActiveAssociate,
-    removeActiveAssociate
+    removeActiveAssociate,
+    addDailyAssignment,
+    removeDailyAssignment,
+    updateDailyAssignments,
+    currentDate,
+    currentShift,
+    lines
   } = useStaffing()
 
   const {
@@ -21,6 +29,7 @@ export function AssignmentsView() {
     lastResult
   } = useAssignmentParser()
 
+  const [activeView, setActiveView] = useState('associates') // 'associates' | 'daily-assignments'
   const [searchQuery, setSearchQuery] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [showResults, setShowResults] = useState(false)
@@ -34,7 +43,26 @@ export function AssignmentsView() {
   const [manualLastName, setManualLastName] = useState('')
   const [manualEmployeeNumber, setManualEmployeeNumber] = useState('')
 
+  // Daily assignment editing
+  const [editingAssignment, setEditingAssignment] = useState(null) // { employeeNumber, line, leads }
+  const [selectedLine, setSelectedLine] = useState('')
+  const [selectedLeads, setSelectedLeads] = useState([])
+
   const fileInputRef = useRef(null)
+
+  // Get unassigned associates
+  const unassignedAssociates = useMemo(() => {
+    return assignmentService.getUnassignedAssociates(activeAssociates, dailyAssignments)
+  }, [activeAssociates, dailyAssignments])
+
+  // Get assigned associates grouped by line
+  const assignmentsByLine = useMemo(() => {
+    const byLine = {}
+    for (const line of lines) {
+      byLine[line.letter] = assignmentService.getAssociatesByLine(dailyAssignments, line.letter)
+    }
+    return byLine
+  }, [dailyAssignments, lines])
 
   const handleFileSelect = async (file) => {
     if (!file) return
@@ -115,6 +143,75 @@ export function AssignmentsView() {
     alert(`Added ${manualFirstName} ${manualLastName} (${cleanedNumber})`)
   }
 
+  // Assign associate to a line
+  const handleAssignToLine = (employeeNumber, lineLetter) => {
+    const associate = activeAssociates[employeeNumber]
+    if (!associate) {
+      alert('Associate not found')
+      return
+    }
+
+    const line = lines.find(l => l.letter === lineLetter)
+    if (!line) {
+      alert('Line not found')
+      return
+    }
+
+    addDailyAssignment(employeeNumber, {
+      firstName: associate.firstName,
+      lastName: associate.lastName,
+      line: lineLetter,
+      leads: line.leads || [],
+      position: null
+    })
+  }
+
+  // Remove assignment
+  const handleRemoveAssignment = (employeeNumber) => {
+    removeDailyAssignment(employeeNumber)
+  }
+
+  // Bulk assign unassigned associates
+  const handleBulkAssign = () => {
+    if (unassignedAssociates.length === 0) {
+      alert('No unassigned associates to assign')
+      return
+    }
+
+    if (lines.length === 0) {
+      alert('No lines configured. Please go to Setup and create lines first.')
+      return
+    }
+
+    // Simple round-robin assignment
+    const updates = { ...dailyAssignments }
+    let lineIndex = 0
+
+    for (const associate of unassignedAssociates) {
+      const line = lines[lineIndex % lines.length]
+      updates[associate.employeeNumber] = assignmentService.createAssignment(
+        associate.employeeNumber,
+        {
+          firstName: associate.firstName,
+          lastName: associate.lastName,
+          line: line.letter,
+          leads: line.leads || []
+        }
+      )
+      lineIndex++
+    }
+
+    updateDailyAssignments(updates)
+    alert(`Assigned ${unassignedAssociates.length} associates across ${lines.length} lines`)
+  }
+
+  // Clear all daily assignments
+  const handleClearAssignments = () => {
+    if (confirm('Clear all daily assignments for this shift? This cannot be undone.')) {
+      updateDailyAssignments({})
+    }
+  }
+
   // Filter active associates
   const filteredAssociates = Object.entries(activeAssociates).filter(([id, assoc]) => {
     if (!searchQuery.trim()) return true
@@ -126,12 +223,31 @@ export function AssignmentsView() {
   return (
     <div className="assignments-view">
       <div className="assignments-header">
-        <h2>Active Associates</h2>
+        <h2>Assignment Management</h2>
         <p>
-          Manage the list of associates who can scan their badges.
-          Upload daily assignment lists or add associates manually.
+          Manage active associates and daily line assignments for {currentDate} - {currentShift} Shift.
         </p>
       </div>
+
+      {/* Tab Navigation */}
+      <div className="assignment-tabs">
+        <button
+          className={`tab-btn ${activeView === 'associates' ? 'active' : ''}`}
+          onClick={() => setActiveView('associates')}
+        >
+          Active Associates ({Object.keys(activeAssociates).length})
+        </button>
+        <button
+          className={`tab-btn ${activeView === 'daily-assignments' ? 'active' : ''}`}
+          onClick={() => setActiveView('daily-assignments')}
+        >
+          Daily Assignments ({Object.keys(dailyAssignments).length})
+        </button>
+      </div>
+
+      {/* Active Associates View */}
+      {activeView === 'associates' && (
+        <div className="associates-tab">
 
       {/* Upload Section */}
       <div
@@ -339,6 +455,149 @@ export function AssignmentsView() {
           )}
         </div>
       </div>
+        </div>
+      )}
+
+      {/* Daily Assignments View */}
+      {activeView === 'daily-assignments' && (
+        <div className="daily-assignments-tab">
+
+          {/* Summary Stats */}
+          <div className="assignment-stats">
+            <div className="stat-card">
+              <div className="stat-number">{Object.keys(dailyAssignments).length}</div>
+              <div className="stat-label">Assigned</div>
+            </div>
+            <div className="stat-card warning">
+              <div className="stat-number">{unassignedAssociates.length}</div>
+              <div className="stat-label">Unassigned</div>
+            </div>
+            <div className="stat-card info">
+              <div className="stat-number">{lines.length}</div>
+              <div className="stat-label">Lines</div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="assignment-actions">
+            <button
+              className="btn btn-success"
+              onClick={handleBulkAssign}
+              disabled={unassignedAssociates.length === 0 || lines.length === 0}
+            >
+              Auto-Assign All ({unassignedAssociates.length})
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={handleClearAssignments}
+              disabled={Object.keys(dailyAssignments).length === 0}
+            >
+              Clear All Assignments
+            </button>
+          </div>
+
+          {/* Unassigned Associates */}
+          {unassignedAssociates.length > 0 && (
+            <div className="unassigned-section">
+              <h3>Unassigned Associates ({unassignedAssociates.length})</h3>
+              <div className="unassigned-list">
+                {unassignedAssociates.map(associate => (
+                  <div key={associate.employeeNumber} className="unassigned-item">
+                    <div className="associate-info">
+                      <div className="associate-avatar">
+                        {associate.firstName?.[0]}{associate.lastName?.[0]}
+                      </div>
+                      <div className="associate-details">
+                        <div className="associate-name">
+                          {associate.firstName} {associate.lastName}
+                        </div>
+                        <div className="associate-id">#{associate.employeeNumber}</div>
+                      </div>
+                    </div>
+                    <div className="assign-controls">
+                      <label style={{ fontSize: '12px', marginRight: '8px' }}>Assign to:</label>
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAssignToLine(associate.employeeNumber, e.target.value)
+                            e.target.value = ''
+                          }
+                        }}
+                        style={{ padding: '4px 8px', fontSize: '12px' }}
+                      >
+                        <option value="">Select Line...</option>
+                        {lines.map(line => (
+                          <option key={line.letter} value={line.letter}>
+                            Line {line.letter} ({line.leads?.join(', ') || 'No leads'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Assignments by Line */}
+          {lines.length > 0 ? (
+            <div className="assignments-by-line">
+              <h3>Assignments by Line</h3>
+              {lines.map(line => {
+                const assigned = assignmentsByLine[line.letter] || []
+                return (
+                  <div key={line.letter} className="line-assignment-section">
+                    <div className="line-header">
+                      <h4>
+                        Line {line.letter}
+                        <span className="line-count">({assigned.length} assigned)</span>
+                      </h4>
+                      <div className="line-leads">
+                        Leads: {line.leads?.join(', ') || 'None'}
+                      </div>
+                    </div>
+
+                    {assigned.length > 0 ? (
+                      <div className="assigned-list">
+                        {assigned.map(assignment => (
+                          <div key={assignment.employeeNumber} className="assigned-item">
+                            <div className="associate-info">
+                              <div className="associate-avatar">
+                                {assignment.firstName?.[0]}{assignment.lastName?.[0]}
+                              </div>
+                              <div className="associate-details">
+                                <div className="associate-name">
+                                  {assignment.firstName} {assignment.lastName}
+                                </div>
+                                <div className="associate-id">#{assignment.employeeNumber}</div>
+                              </div>
+                            </div>
+                            <button
+                              className="btn btn-danger btn-small"
+                              onClick={() => handleRemoveAssignment(assignment.employeeNumber)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
+                        No associates assigned to this line
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+              <p>No lines configured. Please go to the <strong>Setup</strong> tab to create lines first.</p>
+            </div>
+          )}
+
+        </div>
+      )}
     </div>
   )
 }

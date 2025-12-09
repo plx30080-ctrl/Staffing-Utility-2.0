@@ -25,6 +25,7 @@ const extractEmployeeNumber = (badgeData) => {
 export function ScannerProvider({ children }) {
   const {
     activeAssociates,
+    dailyAssignments,
     addToWaitlist,
     isEmployeeAlreadyPresent,
     currentDate,
@@ -168,12 +169,20 @@ export function ScannerProvider({ children }) {
     const fullName = `${associate.firstName} ${associate.lastName}`
     addToWaitlist(fullName, false, employeeNumber)
 
-    // Check if they have a line assignment
+    // Check daily assignment first, then fallback to line assignment
+    const dailyAssignment = dailyAssignments[employeeNumber]
     const lineAssignment = findLineAssignment(employeeNumber)
+    const assignment = dailyAssignment || lineAssignment
 
     let message = `${fullName} (${employeeNumber}) - Welcome back!`
-    if (lineAssignment) {
-      message += `\n\nAssigned to: Line ${lineAssignment.line}\nLead(s): ${lineAssignment.leads.join(', ')}`
+    if (assignment) {
+      message += `\n\nAssigned to: Line ${assignment.line}`
+      if (assignment.leads && assignment.leads.length > 0) {
+        message += `\nLead(s): ${assignment.leads.join(', ')}`
+      }
+      if (dailyAssignment) {
+        message += '\n\n[Pre-assigned for today\'s shift]'
+      }
     } else {
       message += '\n\nAdded to waitlist. Please wait for assignment.'
     }
@@ -186,6 +195,7 @@ export function ScannerProvider({ children }) {
       message,
       addedToWaitlist: true,
       lineAssignment,
+      dailyAssignment,
       rawData: badgeData,
       timestamp: new Date().toISOString()
     }
@@ -196,13 +206,13 @@ export function ScannerProvider({ children }) {
     await logScan(result)
 
     // Trigger door unlock signal if assigned (for future hardware integration)
-    if (lineAssignment) {
+    if (assignment) {
       triggerDoorUnlock()
     }
 
     setIsProcessing(false)
     return result
-  }, [activeAssociates, addToWaitlist, isEmployeeAlreadyPresent, isKioskMode, currentDate, currentShift, lines])
+  }, [activeAssociates, dailyAssignments, addToWaitlist, isEmployeeAlreadyPresent, isKioskMode, currentDate, currentShift, lines])
 
   // Find if an employee has a line assignment
   const findLineAssignment = useCallback((employeeNumber) => {
