@@ -142,13 +142,25 @@ function ScanResultDisplay({ result }) {
         {result.message}
       </div>
 
-      {result.lineAssignment && (
+      {(result.dailyAssignment || result.lineAssignment) && (
         <div className="scan-result-assignment">
           <h4>Your Assignment</h4>
-          <div className="line">Line {result.lineAssignment.line}</div>
-          {result.lineAssignment.leads.length > 0 && (
+          <div className="line">
+            Line {(result.dailyAssignment || result.lineAssignment).line}
+          </div>
+          {(result.dailyAssignment || result.lineAssignment).leads?.length > 0 && (
             <div className="leads">
-              Lead(s): {result.lineAssignment.leads.join(', ')}
+              Lead(s): {(result.dailyAssignment || result.lineAssignment).leads.join(', ')}
+            </div>
+          )}
+          {result.dailyAssignment && (
+            <div style={{
+              marginTop: '10px',
+              fontSize: '14px',
+              color: '#059669',
+              fontWeight: '600'
+            }}>
+              ✓ Pre-assigned for today's shift
             </div>
           )}
         </div>

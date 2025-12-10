@@ -85,6 +85,9 @@ export function ScannerProvider({ children }) {
   // Process a scanned badge
   const processScan = useCallback(async (badgeData) => {
     if (isProcessing) return
+
+    // Clear any previous scan result immediately
+    setScanResult(null)
     setIsProcessing(true)
 
     const employeeNumber = extractEmployeeNumber(badgeData)
@@ -278,7 +281,7 @@ export function ScannerProvider({ children }) {
     if (scanResult) {
       const timeout = setTimeout(() => {
         setScanResult(null)
-      }, 5000) // Clear after 5 seconds
+      }, 2000) // Clear after 2 seconds (faster for kiosk mode)
 
       return () => clearTimeout(timeout)
     }

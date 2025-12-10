@@ -26,6 +26,7 @@ export function StaffingProvider({ children }) {
   const [firebaseStatus, setFirebaseStatus] = useState(isFirebaseConfigured ? 'connected' : 'offline')
   const [isLocked, setIsLocked] = useState(false)
   const saveTimeoutRef = useRef(null)
+  const isLocalChangeRef = useRef(false) // Track if we're making local changes
 
   // Load core associates on mount
   useEffect(() => {
@@ -100,8 +101,8 @@ export function StaffingProvider({ children }) {
 
     const docId = `${currentDate}_${currentShift}`
     const unsubscribe = subscribeToData(`${DB_PATHS.STAFFING}/${docId}`, (data) => {
-      if (data) {
-        // Only update waitlist from remote if we're not currently editing
+      if (data && !isLocalChangeRef.current) {
+        // Only update from remote if we're not currently making local changes
         if (data.waitlist) {
           setWaitlist(data.waitlist)
         }
@@ -155,12 +156,19 @@ export function StaffingProvider({ children }) {
   useEffect(() => {
     if (lines.length === 0) return
 
+    // Mark that we're making local changes
+    isLocalChangeRef.current = true
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
 
     saveTimeoutRef.current = setTimeout(() => {
       handleAutoSave()
+      // Reset the local change flag after save completes
+      setTimeout(() => {
+        isLocalChangeRef.current = false
+      }, 500)
     }, 2000)
 
     return () => {
