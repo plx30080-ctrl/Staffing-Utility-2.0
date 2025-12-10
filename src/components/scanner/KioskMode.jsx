@@ -9,7 +9,9 @@ export function KioskMode() {
     toggleKioskMode,
     scanResult,
     manualScan,
-    isProcessing
+    isProcessing,
+    audioEnabled,
+    setAudioEnabled
   } = useScanner()
 
   const { lines, currentDate, currentShift } = useStaffing()
@@ -104,7 +106,23 @@ export function KioskMode() {
         <div>
           {currentDate} • {currentShift} Shift
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            className="kiosk-audio-toggle"
+            onClick={() => setAudioEnabled(!audioEnabled)}
+            title={audioEnabled ? 'Mute audio' : 'Enable audio'}
+            style={{
+              background: audioEnabled ? '#10b981' : '#6b7280',
+              border: 'none',
+              color: 'white',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            {audioEnabled ? '🔊' : '🔇'}
+          </button>
           <button
             className="kiosk-exit-btn"
             onClick={() => setShowStaffingView(!showStaffingView)}

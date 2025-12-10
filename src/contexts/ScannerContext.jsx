@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useStaffing } from './StaffingContext'
 import { db, isFirebaseConfigured, saveData, DB_PATHS } from '../config/firebase'
+import { useAudioFeedback } from '../hooks/useAudioFeedback'
 
 const ScannerContext = createContext(null)
 
@@ -33,6 +34,8 @@ export function ScannerProvider({ children }) {
     lines
   } = useStaffing()
 
+  const { playSuccess, playError, playWarning, playDuplicate } = useAudioFeedback()
+
   const [isScanModeActive, setIsScanModeActive] = useState(false)
   const [isKioskMode, setIsKioskMode] = useState(false)
   const [lastScan, setLastScan] = useState(null)
@@ -40,6 +43,7 @@ export function ScannerProvider({ children }) {
   const [scanHistory, setScanHistory] = useState([])
   const [scanBuffer, setScanBuffer] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [audioEnabled, setAudioEnabled] = useState(true)
 
   const scanTimeoutRef = useRef(null)
   const inputBufferRef = useRef('')
@@ -103,6 +107,7 @@ export function ScannerProvider({ children }) {
       setScanResult(result)
       setLastScan(result)
       setScanHistory(prev => [result, ...prev.slice(0, 49)])
+      if (audioEnabled) playError()
       setIsProcessing(false)
       return result
     }
@@ -124,6 +129,7 @@ export function ScannerProvider({ children }) {
       setLastScan(result)
       setScanHistory(prev => [result, ...prev.slice(0, 49)])
       await logScan(result)
+      if (audioEnabled) playWarning()
       setIsProcessing(false)
       return result
     }
@@ -164,6 +170,7 @@ export function ScannerProvider({ children }) {
       setScanResult(result)
       setLastScan(result)
       setScanHistory(prev => [result, ...prev.slice(0, 49)])
+      if (audioEnabled) playDuplicate()
       setIsProcessing(false)
       return result
     }
@@ -208,6 +215,9 @@ export function ScannerProvider({ children }) {
     setScanHistory(prev => [result, ...prev.slice(0, 49)])
     await logScan(result)
 
+    // Play success audio
+    if (audioEnabled) playSuccess()
+
     // Trigger door unlock signal if assigned (for future hardware integration)
     if (assignment) {
       triggerDoorUnlock()
@@ -215,7 +225,7 @@ export function ScannerProvider({ children }) {
 
     setIsProcessing(false)
     return result
-  }, [activeAssociates, dailyAssignments, addToWaitlist, isEmployeeAlreadyPresent, isKioskMode, currentDate, currentShift, lines])
+  }, [activeAssociates, dailyAssignments, addToWaitlist, isEmployeeAlreadyPresent, isKioskMode, currentDate, currentShift, lines, audioEnabled, playSuccess, playError, playWarning, playDuplicate])
 
   // Find if an employee has a line assignment
   const findLineAssignment = useCallback((employeeNumber) => {
@@ -318,12 +328,14 @@ export function ScannerProvider({ children }) {
     scanResult,
     scanHistory,
     isProcessing,
+    audioEnabled,
 
     // Methods
     toggleScanMode,
     toggleKioskMode,
     setIsScanModeActive,
     setIsKioskMode,
+    setAudioEnabled,
     manualScan,
     processScan,
     triggerDoorUnlock,

@@ -10,6 +10,7 @@ import { SetupView } from './views/SetupView'
 import { ReportsView } from './views/ReportsView'
 import { CoreTeamView } from './views/CoreTeamView'
 import { AssignmentsView } from './views/AssignmentsView'
+import { AssignmentHistoryView } from './views/AssignmentHistoryView'
 
 import { ScanModeOverlay } from './components/scanner/ScanModeOverlay'
 import { KioskMode } from './components/scanner/KioskMode'
@@ -42,18 +43,21 @@ function App() {
     if (path === '/reports') return 'reports'
     if (path === '/core-team') return 'core'
     if (path === '/assignments') return 'assignments'
+    if (path === '/history') return 'history'
     return 'setup'
   }
 
   const activeTab = getActiveTab()
 
   const handleTabChange = (tab) => {
+    setActiveTab(tab)
     const routes = {
       setup: '/',
       staffing: '/staffing',
       reports: '/reports',
       core: '/core-team',
-      assignments: '/assignments'
+      assignments: '/assignments',
+      history: '/history'
     }
     navigate(routes[tab] || '/')
   }
@@ -210,6 +214,12 @@ function App() {
             >
               Assignments
             </button>
+            <button
+              className={`tab ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => handleTabChange('history')}
+            >
+              History
+            </button>
           </div>
 
           <Routes>
@@ -218,6 +228,7 @@ function App() {
             <Route path="/reports" element={<ReportsView onLoadReport={handleLoadReport} />} />
             <Route path="/core-team" element={<CoreTeamView />} />
             <Route path="/assignments" element={<AssignmentsView />} />
+            <Route path="/history" element={<AssignmentHistoryView />} />
           </Routes>
         </div>
       </div>
